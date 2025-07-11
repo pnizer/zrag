@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { createInitCommand } from './commands/init.js';
+import { createDbInitCommand } from './commands/db-init.js';
 
 const program = new Command();
 
@@ -11,14 +12,7 @@ program
 
 // Add commands
 program.addCommand(createInitCommand());
-
-// Placeholder commands for other functionality
-program
-  .command('db-init')
-  .description('Initialize the database')
-  .action(() => {
-    console.log('🚧 Database initialization not implemented yet');
-  });
+program.addCommand(createDbInitCommand());
 
 program
   .command('add <file>')
