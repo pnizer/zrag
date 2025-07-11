@@ -646,7 +646,7 @@ rag-tool/
 - [x] 2.1.4 Implement DatabaseService with CRUD operations
 - [x] 2.1.5 Add vector similarity search functions
 - [x] 2.1.6 Create database migration system
-- [ ] 2.2.1 Implement DocumentService for file loading
+- [x] 2.2.1 Implement DocumentService for file loading
 - [ ] 2.2.2 Create chunking strategies (character-based, sentence-based)
 - [ ] 2.2.3 Add text preprocessing and cleaning utilities
 - [ ] 2.2.4 Implement overlap handling for chunks

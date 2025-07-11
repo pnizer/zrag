@@ -34,7 +34,7 @@ export class DatabaseService {
       await this.createTables();
       
       // TODO: Load sqlite-vss extension when binaries are bundled
-      // await this.loadVectorExtension();
+      await this.loadVectorExtension();
       
     } catch (error) {
       throw new DatabaseError(`Failed to initialize database: ${String(error)}`);
@@ -393,7 +393,7 @@ export class DatabaseService {
   /**
    * Basic similarity search (placeholder until vector extension is implemented)
    */
-  searchSimilarChunks(queryEmbedding: number[], limit: number = 10, threshold: number = 0.7): Array<{
+  searchSimilarChunks(_queryEmbedding: number[], _limit: number = 10, _threshold: number = 0.7): Array<{
     chunk: Chunk;
     document: Document;
     similarity_score: number;
