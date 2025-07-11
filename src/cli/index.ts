@@ -1,67 +1,16 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
-import { ConfigManager } from './utils/config.js';
+import { createInitCommand } from './commands/init.js';
 
 const program = new Command();
 
 program
   .name('rag-tool')
-  .description('TypeScript-based RAG tool with contextual retrieval')
+  .description('TypeScript-based RAG tool implementing Anthropic\'s contextual retrieval methodology')
   .version('0.1.0');
 
-// Init command placeholder
-program
-  .command('init')
-  .description('Initialize RAG tool configuration')
-  .option('--config-path <path>', 'Custom configuration path')
-  .action(async (options) => {
-    try {
-      const configManager = new ConfigManager(options.configPath);
-      
-      if (await configManager.exists()) {
-        console.log('✓ Configuration already exists at:', configManager.getConfigPath());
-        return;
-      }
-
-      console.log('🚀 Initializing RAG tool...');
-      console.log('📁 Configuration directory:', configManager.getConfigDir());
-      console.log('⚙️  Configuration file:', configManager.getConfigPath());
-      console.log('💾 Database file:', configManager.getDatabasePath());
-      
-      // For now, just create the directory
-      await configManager.ensureConfigDir();
-      console.log('✓ Configuration directory created');
-      console.log('');
-      console.log('Next steps:');
-      console.log('1. Set up your API keys');
-      console.log('2. Run "rag-tool db-init" to initialize the database');
-      console.log('3. Start adding documents with "rag-tool add <file>"');
-      
-    } catch (error) {
-      console.error('❌ Initialization failed:', String(error));
-      process.exit(1);
-    }
-  });
-
-// Test command for configuration
-program
-  .command('config')
-  .description('Show configuration information')
-  .option('--config-path <path>', 'Custom configuration path')
-  .action(async (options) => {
-    try {
-      const configManager = new ConfigManager(options.configPath);
-      
-      console.log('Configuration Information:');
-      console.log('📁 Config directory:', configManager.getConfigDir());
-      console.log('⚙️  Config file:', configManager.getConfigPath());
-      console.log('💾 Database file:', configManager.getDatabasePath());
-      console.log('📋 Config exists:', await configManager.exists());
-      
-    } catch (error) {
-      console.error('❌ Failed to show config:', String(error));
-      process.exit(1);
-    }
-  });
+// Add commands
+program.addCommand(createInitCommand());
 
 // Placeholder commands for other functionality
 program

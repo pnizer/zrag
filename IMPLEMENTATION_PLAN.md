@@ -661,19 +661,19 @@ rag-tool/
 - [x] 2.4.4 Implement batch embedding processing
 
 ### Phase 3: CLI Implementation (Days 5-6)
-- [ ] 3.1.1 Implement `rag-tool init` command for project initialization
+- [x] 3.1.1 Implement `rag-tool init` command for project initialization
 - [ ] 3.1.2 Create `rag-tool db-init` for database setup
 - [ ] 3.1.3 Add `rag-tool add <file>` for document ingestion
 - [ ] 3.1.4 Implement `rag-tool search <query>` for testing searches
 - [ ] 3.1.5 Add `rag-tool server` to start MCP server
-- [ ] 3.2.1 Add progress indicators for long-running operations
-- [ ] 3.2.2 Implement comprehensive error messages
-- [ ] 3.2.3 Create help documentation for each command
-- [ ] 3.2.4 Add configuration validation and troubleshooting
-- [ ] 3.3.1 Implement API key collection with secure input
-- [ ] 3.3.2 Add model selection after fetching available models
-- [ ] 3.3.3 Create configuration validation and testing
-- [ ] 3.3.4 Add setup completion confirmation
+- [x] 3.2.1 Add progress indicators for long-running operations
+- [x] 3.2.2 Implement comprehensive error messages
+- [x] 3.2.3 Create help documentation for each command
+- [x] 3.2.4 Add configuration validation and troubleshooting
+- [x] 3.3.1 Implement API key collection with secure input
+- [x] 3.3.2 Add model selection after fetching available models
+- [x] 3.3.3 Create configuration validation and testing
+- [x] 3.3.4 Add setup completion confirmation
 
 ### Phase 4: MCP Server Integration (Days 7-8)
 - [ ] 4.1.1 Set up MCP server with TypeScript SDK
