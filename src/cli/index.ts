@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { createInitCommand } from './commands/init.js';
 import { createDbInitCommand } from './commands/db-init.js';
+import { createAddCommand } from './commands/add.js';
 
 const program = new Command();
 
@@ -13,13 +14,7 @@ program
 // Add commands
 program.addCommand(createInitCommand());
 program.addCommand(createDbInitCommand());
-
-program
-  .command('add <file>')
-  .description('Add a document to the knowledge base')
-  .action((file) => {
-    console.log(`🚧 Document addition not implemented yet: ${file}`);
-  });
+program.addCommand(createAddCommand());
 
 program
   .command('search <query>')

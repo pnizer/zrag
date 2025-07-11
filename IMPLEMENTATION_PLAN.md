@@ -663,7 +663,7 @@ rag-tool/
 ### Phase 3: CLI Implementation (Days 5-6)
 - [x] 3.1.1 Implement `rag-tool init` command for project initialization
 - [x] 3.1.2 Create `rag-tool db-init` for database setup
-- [ ] 3.1.3 Add `rag-tool add <file>` for document ingestion
+- [x] 3.1.3 Add `rag-tool add <file>` for document ingestion
 - [ ] 3.1.4 Implement `rag-tool search <query>` for testing searches
 - [ ] 3.1.5 Add `rag-tool server` to start MCP server
 - [x] 3.2.1 Add progress indicators for long-running operations
