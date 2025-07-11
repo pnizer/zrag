@@ -120,6 +120,71 @@ Please give a short succinct context to situate this chunk within the overall do
   }
 
   /**
+   * Generate text using OpenAI chat completion with flexible options
+   */
+  async generateText(
+    prompt: string,
+    options?: {
+      model?: string;
+      maxTokens?: number;
+      temperature?: number;
+      user?: string;
+    }
+  ): Promise<{
+    text: string;
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
+    cached?: boolean;
+  }> {
+    const opts = {
+      model: 'gpt-4o-mini',
+      maxTokens: 500,
+      temperature: 0.1,
+      ...options,
+    };
+
+    try {
+      const response = await this.withRetry(() =>
+        this.client.chat.completions.create({
+          model: opts.model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: opts.maxTokens,
+          temperature: opts.temperature,
+          ...(opts.user && { user: opts.user }), // Include user param for caching if provided
+        })
+      );
+
+      const result: {
+        text: string;
+        usage?: {
+          promptTokens: number;
+          completionTokens: number;
+          totalTokens: number;
+        };
+        cached?: boolean;
+      } = {
+        text: response.choices[0]?.message?.content?.trim() ?? '',
+        cached: false,
+      };
+
+      if (response.usage) {
+        result.usage = {
+          promptTokens: response.usage.prompt_tokens,
+          completionTokens: response.usage.completion_tokens,
+          totalTokens: response.usage.total_tokens,
+        };
+      }
+
+      return result;
+    } catch (error) {
+      throw new ApiError(`Failed to generate text: ${String(error)}`, this.name);
+    }
+  }
+
+  /**
    * Generate context with caching optimization
    */
   async generateContextWithCache(

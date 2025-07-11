@@ -647,14 +647,14 @@ rag-tool/
 - [x] 2.1.5 Add vector similarity search functions
 - [x] 2.1.6 Create database migration system
 - [x] 2.2.1 Implement DocumentService for file loading
-- [ ] 2.2.2 Create chunking strategies (character-based, sentence-based)
-- [ ] 2.2.3 Add text preprocessing and cleaning utilities
-- [ ] 2.2.4 Implement overlap handling for chunks
-- [ ] 2.3.1 Implement ContextService using OpenAI GPT-4o-mini for cost efficiency
-- [ ] 2.3.2 Use Anthropic's official contextual retrieval prompt template
-- [ ] 2.3.3 Implement OpenAI prompt caching for cost optimization (up to 75% savings)
-- [ ] 2.3.4 Add batch processing for multiple chunks with shared document context
-- [ ] 2.3.5 Implement error handling and retry logic
+- [x] 2.2.2 Create chunking strategies (character-based, sentence-based)
+- [x] 2.2.3 Add text preprocessing and cleaning utilities
+- [x] 2.2.4 Implement overlap handling for chunks
+- [x] 2.3.1 Implement ContextService using OpenAI GPT-4o-mini for cost efficiency
+- [x] 2.3.2 Use Anthropic's official contextual retrieval prompt template
+- [x] 2.3.3 Implement OpenAI prompt caching for cost optimization (up to 75% savings)
+- [x] 2.3.4 Add batch processing for multiple chunks with shared document context
+- [x] 2.3.5 Implement error handling and retry logic
 - [ ] 2.4.1 Implement EmbeddingService with OpenAI integration
 - [ ] 2.4.2 Add support for different embedding models
 - [ ] 2.4.3 Create embedding storage and retrieval
