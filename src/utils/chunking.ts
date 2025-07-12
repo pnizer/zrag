@@ -86,61 +86,64 @@ export class TextChunker {
   }
 
   /**
-   * Chunk text by sentences with overlap
+   * Chunk text by sentences with overlap (simplified safe version)
    */
   private chunkBySentence(text: string): TextChunk[] {
     const sentences = this.splitIntoSentences(text);
     const chunks: TextChunk[] = [];
     
-    let currentChunk = '';
-    let currentStartPos = 0;
     let chunkIndex = 0;
-    let sentenceIndex = 0;
+    let i = 0;
     
-    while (sentenceIndex < sentences.length) {
-      const sentence = sentences[sentenceIndex];
-      if (!sentence) {
-        sentenceIndex++;
-        continue;
-      }
-      const testChunk = currentChunk + (currentChunk ? ' ' : '') + sentence.text;
+    while (i < sentences.length) {
+      let currentChunk = '';
+      let startPos = sentences[i]!.startPosition;
+      let endPos = startPos;
       
-      // If adding this sentence would exceed chunk size, finalize current chunk
-      if (testChunk.length > this.options.chunkSize && currentChunk.length > 0) {
-        const endPos = currentStartPos + currentChunk.length;
+      // Build chunk by adding sentences until we hit the size limit
+      while (i < sentences.length) {
+        const sentence = sentences[i]!;
+        const testChunk = currentChunk + (currentChunk ? ' ' : '') + sentence.text;
         
+        if (testChunk.length > this.options.chunkSize && currentChunk.length > 0) {
+          // Current chunk is full, break to create it
+          break;
+        }
+        
+        currentChunk = testChunk;
+        endPos = sentence.endPosition;
+        i++;
+      }
+      
+      // Create the chunk
+      if (currentChunk.trim().length > 0) {
         chunks.push({
           text: currentChunk.trim(),
-          startPosition: currentStartPos,
+          startPosition: startPos,
           endPosition: endPos,
           index: chunkIndex++
         });
         
-        // Start new chunk with overlap
-        const overlapSentences = this.getOverlapSentences(sentences, sentenceIndex, this.options.overlap);
-        currentChunk = overlapSentences.map(s => s.text).join(' ');
-        currentStartPos = overlapSentences.length > 0 ? overlapSentences[0]!.startPosition : sentence.startPosition;
-        
-        // Skip sentences that are already included in overlap
-        sentenceIndex = Math.max(sentenceIndex - overlapSentences.length + 1, sentenceIndex);
-      } else {
-        // Add sentence to current chunk
-        currentChunk = testChunk;
-        if (currentChunk === sentence.text) {
-          currentStartPos = sentence.startPosition;
+        // Calculate overlap for next chunk
+        if (i < sentences.length) {
+          // Move back by approximately overlap amount, but safely
+          const overlapChars = Math.min(this.options.overlap, Math.floor(currentChunk.length / 2));
+          let backtrackChars = 0;
+          let backtrackSentences = 0;
+          
+          // Count back until we have enough overlap or run out of sentences
+          for (let j = i - 1; j >= 0 && backtrackChars < overlapChars; j--) {
+            backtrackChars += sentences[j]!.text.length;
+            backtrackSentences++;
+          }
+          
+          // Move back by the calculated amount, but ensure we make progress
+          i = Math.max(i - backtrackSentences, i - Math.floor(backtrackSentences / 2));
         }
-        sentenceIndex++;
+      } else {
+        // Safety: if somehow we get an empty chunk, just advance
+        i++;
       }
-    }
-    
-    // Add final chunk if there's remaining text
-    if (currentChunk.trim().length > 0) {
-      chunks.push({
-        text: currentChunk.trim(),
-        startPosition: currentStartPos,
-        endPosition: currentStartPos + currentChunk.length,
-        index: chunkIndex
-      });
     }
     
     return chunks;
@@ -185,31 +188,6 @@ export class TextChunker {
     }
     
     return sentences;
-  }
-
-  /**
-   * Get sentences for overlap based on character count
-   */
-  private getOverlapSentences(
-    sentences: Array<{ text: string; startPosition: number; endPosition: number }>, 
-    currentIndex: number, 
-    overlapSize: number
-  ): Array<{ text: string; startPosition: number; endPosition: number }> {
-    const overlapSentences: Array<{ text: string; startPosition: number; endPosition: number }> = [];
-    let overlapLength = 0;
-    
-    // Work backwards from current position to build overlap
-    for (let i = currentIndex - 1; i >= 0 && overlapLength < overlapSize; i--) {
-      const sentence = sentences[i];
-      if (sentence && overlapLength + sentence.text.length <= overlapSize) {
-        overlapSentences.unshift(sentence);
-        overlapLength += sentence.text.length;
-      } else {
-        break;
-      }
-    }
-    
-    return overlapSentences;
   }
 
   /**

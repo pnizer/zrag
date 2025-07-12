@@ -35,8 +35,8 @@ async function addDocument(
     configPath?: string; 
     skipContext?: boolean;
     skipEmbedding?: boolean;
-    force?: boolean;
     dryRun?: boolean;
+    force?: boolean;
   }
 ): Promise<void> {
   const startTime = Date.now();
@@ -113,12 +113,46 @@ async function addDocument(
       console.log('🔍 Dry run mode - analyzing file...');
       const fileStats = await getFileStats(absolutePath);
       console.log(`  📊 File size: ${formatFileSize(fileStats.size)}`);
-      console.log(`  📄 Estimated chunks: ~${Math.ceil(fileStats.size / config.chunking.chunkSize)}`);
       console.log(`  ⚙️  Chunking strategy: ${config.chunking.strategy}`);
       console.log(`  📏 Chunk size: ${config.chunking.chunkSize} characters`);
       console.log(`  🔄 Overlap: ${config.chunking.overlap} characters`);
+      
+      // Perform actual chunking analysis without storing
       console.log('');
-      console.log('👆 Use without --dry-run to actually process the document');
+      console.log('🧪 Performing chunking analysis...');
+      
+      try {
+        const dryRunResult = await performDryRunAnalysis(absolutePath, config.chunking);
+        
+        console.log('');
+        console.log('📋 Chunking Analysis Results:');
+        console.log(`  📝 Original content length: ${dryRunResult.contentLength.toLocaleString()} characters`);
+        console.log(`  ✂️  Total chunks created: ${dryRunResult.chunks.length}`);
+        console.log(`  📊 Average chunk size: ${Math.round(dryRunResult.avgChunkSize)} characters`);
+        console.log(`  📏 Min chunk size: ${dryRunResult.minChunkSize} characters`);
+        console.log(`  📐 Max chunk size: ${dryRunResult.maxChunkSize} characters`);
+        console.log(`  🔄 Total overlap: ${dryRunResult.totalOverlap} characters`);
+        
+        console.log('');
+        console.log('🎯 API Calls that would be made:');
+        if (!options.skipContext) {
+          console.log(`  🧠 Context generation: ${dryRunResult.chunks.length} calls to ${config.providers.openai?.contextModel || 'gpt-4o-mini'}`);
+          console.log(`    📊 Est. tokens per call: ~${Math.ceil((dryRunResult.contentLength + dryRunResult.avgChunkSize) / 4)}`);
+          console.log(`    💰 Est. total tokens: ~${Math.ceil((dryRunResult.contentLength + dryRunResult.avgChunkSize) * dryRunResult.chunks.length / 4).toLocaleString()}`);
+        }
+        if (!options.skipEmbedding) {
+          console.log(`  🔢 Embedding generation: ${dryRunResult.chunks.length} calls to ${config.providers.openai?.embeddingModel || 'text-embedding-3-small'}`);
+          console.log(`    📊 Est. tokens per call: ~${Math.ceil(dryRunResult.avgChunkSize / 4)}`);
+          console.log(`    💰 Est. total tokens: ~${Math.ceil(dryRunResult.avgChunkSize * dryRunResult.chunks.length / 4).toLocaleString()}`);
+        }
+        
+        console.log('');
+        console.log('👆 Use without --dry-run to actually process the document');
+        
+      } catch (error) {
+        console.error('❌ Chunking analysis failed:', error instanceof Error ? error.message : String(error));
+      }
+      
       return;
     }
 
@@ -253,4 +287,44 @@ async function getFileStats(filePath: string): Promise<{ size: number }> {
   const fs = require('fs').promises;
   const stats = await fs.stat(filePath);
   return { size: stats.size };
+}
+
+async function performDryRunAnalysis(filePath: string, chunkingOptions: any): Promise<{
+  contentLength: number;
+  chunks: Array<{ text: string; startPosition: number; endPosition: number; index: number }>;
+  avgChunkSize: number;
+  minChunkSize: number;
+  maxChunkSize: number;
+  totalOverlap: number;
+}> {
+  const fs = require('fs').promises;
+  const { TextProcessor } = require('../../utils/text-processing.js');
+  const { TextChunker } = require('../../utils/chunking.js');
+  
+  // Read and process the file
+  const content = await fs.readFile(filePath, 'utf8');
+  const extractedText = TextProcessor.extractText(content, 'txt');
+  
+  // Perform chunking
+  const chunker = new TextChunker(chunkingOptions);
+  const chunks = chunker.chunk(extractedText);
+  
+  // Calculate statistics
+  const chunkSizes = chunks.map((chunk: any) => chunk.text.length);
+  const avgChunkSize = chunkSizes.reduce((sum: number, size: number) => sum + size, 0) / chunks.length;
+  const minChunkSize = Math.min(...chunkSizes);
+  const maxChunkSize = Math.max(...chunkSizes);
+  
+  // Calculate total overlap (approximate)
+  const totalContentInChunks = chunkSizes.reduce((sum: number, size: number) => sum + size, 0);
+  const totalOverlap = totalContentInChunks - extractedText.length;
+  
+  return {
+    contentLength: extractedText.length,
+    chunks,
+    avgChunkSize,
+    minChunkSize,
+    maxChunkSize,
+    totalOverlap: Math.max(0, totalOverlap)
+  };
 }
