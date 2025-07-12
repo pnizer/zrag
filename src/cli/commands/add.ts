@@ -47,7 +47,7 @@ async function addDocument(
 ): Promise<void> {
   const startTime = Date.now();
   
-  console.log('📄 RAG Tool Document Ingestion');
+  console.log('📄 zrag Document Ingestion');
   console.log('');
 
   // Validate file path
@@ -60,7 +60,7 @@ async function addDocument(
   const configManager = new ConfigManager(options.configPath);
   
   if (!configManager.exists()) {
-    console.error('❌ Configuration not found. Run "rag-tool init" first.');
+    console.error('❌ Configuration not found. Run "zrag init" first.');
     process.exit(1);
   }
 
@@ -78,7 +78,7 @@ async function addDocument(
       progress.stop('Database connected');
     } catch (error) {
       progress.fail('Database connection failed');
-      throw new Error('Database not initialized. Run "rag-tool db-init" first.');
+      throw new Error('Database not initialized. Run "zrag db-init" first.');
     }
   }
 
@@ -299,8 +299,8 @@ async function addDocument(
       console.log(`  🔍 Status: ${finalStatus}`);
       console.log('');
       console.log('Next steps:');
-      console.log(`  🔍 Search: rag-tool search "your query"`);
-      console.log(`  📋 List: rag-tool list`);
+      console.log(`  🔍 Search: zrag search "your query"`);
+      console.log(`  📋 List: zrag list`);
       console.log('');
     }
   } finally {

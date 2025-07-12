@@ -1,6 +1,4 @@
-# RAG Tool 🔍
-
-> **Note**: This project was lovingly vibe-coded with Claude Code. What started as a careful implementation plan quickly turned into an experimental journey of discovery, feature additions, and "hey, what if we just..." moments.
+# zrag 🔍
 
 A TypeScript-based Retrieval-Augmented Generation (RAG) tool implementing Anthropic's contextual retrieval methodology for 35% improved search accuracy. Features both CLI functionality and upcoming MCP (Model Context Protocol) server capabilities.
 
@@ -41,11 +39,11 @@ A TypeScript-based Retrieval-Augmented Generation (RAG) tool implementing Anthro
 
 ```bash
 # Install via npm (when published)
-npx rag-tool init
+npx zrag init
 
 # Or clone and build locally
 git clone <repository>
-cd rag-tool
+cd zrag
 npm install
 npm run build
 ```
@@ -54,46 +52,241 @@ npm run build
 
 ```bash
 # Initialize configuration
-npx rag-tool init
+npx zrag init
 
 # Set up database
-npx rag-tool db-init
+npx zrag db-init
 
 # Add a document with default settings
-npx rag-tool add document.txt
+npx zrag add document.txt
 
 # Add with custom parallelism and verbose logging
-npx rag-tool add document.txt --max-parallel 10 --verbose
+npx zrag add document.txt --max-parallel 10 --verbose
 
 # Search your documents
-npx rag-tool search "your search query"
+npx zrag search "your search query"
 
 # List all documents
-npx rag-tool list
+npx zrag list
 ```
 
 ### Advanced Options
 
 ```bash
 # Skip context generation (embedding only)
-npx rag-tool add document.txt --skip-context
+npx zrag add document.txt --skip-context
 
 # Skip embedding generation (context only)
-npx rag-tool add document.txt --skip-embedding
+npx zrag add document.txt --skip-embedding
 
 # Dry run to see what would happen
-npx rag-tool add document.txt --dry-run --verbose
+npx zrag add document.txt --dry-run --verbose
 
 # Force overwrite existing document
-npx rag-tool add document.txt --force
+npx zrag add document.txt --force
 
 # Use custom config path
-npx rag-tool add document.txt --config-path /path/to/config.json
+npx zrag add document.txt --config-path /path/to/config.json
+```
+
+## 📚 How to Use
+
+### Complete Workflow
+
+```bash
+# 1. Initialize configuration (interactive setup)
+zrag init
+
+# 2. Set up database
+zrag db-init
+
+# 3. Add documents to your knowledge base
+zrag add path/to/document.txt
+
+# 4. Search your documents
+zrag search "your question or query"
+```
+
+### 🔧 Command Reference
+
+#### `zrag init`
+Initialize RAG tool configuration with interactive setup.
+
+```bash
+zrag init [options]
+
+Options:
+  --config-path <path>    Path to configuration file
+  --force                 Overwrite existing configuration
+```
+
+**Examples:**
+```bash
+# Interactive setup with default config location
+zrag init
+
+# Use custom config path
+zrag init --config-path /custom/path/config.json
+
+# Force overwrite existing config
+zrag init --force
+```
+
+#### `zrag db-init`
+Initialize the database with required schemas and indexes.
+
+```bash
+zrag db-init [options]
+
+Options:
+  --config-path <path>    Path to configuration file
+  --force                 Recreate database if it already exists
+  --test                  Test database operations after initialization
+```
+
+**Examples:**
+```bash
+# Standard database initialization
+zrag db-init
+
+# Recreate database (deletes existing data)
+zrag db-init --force
+
+# Initialize and test database operations
+zrag db-init --test
+```
+
+#### `zrag add`
+Add documents to the knowledge base with full processing pipeline.
+
+```bash
+zrag add <file> [options]
+
+Arguments:
+  file                           Path to the document file to add
+
+Options:
+  --config-path <path>           Path to configuration file
+  --skip-context                 Skip context generation step
+  --skip-embedding              Skip embedding generation step
+  --force                       Overwrite existing document with same content hash
+  --dry-run                     Show what would be done without actually processing
+  --verbose                     Show detailed logs including chunking and API details
+  --max-parallel <number>       Maximum chunks to process in parallel (default: 5)
+  --rebuild-vector-index        Rebuild vector index from existing embeddings
+```
+
+**Examples:**
+```bash
+# Add document with default settings
+zrag add document.txt
+
+# Add with verbose logging and higher parallelism
+zrag add document.txt --verbose --max-parallel 10
+
+# Dry run to see what would happen
+zrag add document.txt --dry-run --verbose
+
+# Skip context generation (faster, embedding only)
+zrag add document.txt --skip-context
+
+# Skip embedding generation (context only)
+zrag add document.txt --skip-embedding
+
+# Force overwrite existing document
+zrag add document.txt --force
+
+# Process with custom parallelism (good for API rate limits)
+zrag add large-document.txt --max-parallel 3
+```
+
+#### `zrag search`
+Search through indexed documents using semantic similarity.
+
+```bash
+zrag search <query> [options]
+
+Arguments:
+  query                         Search query text
+
+Options:
+  -l, --limit <number>          Maximum number of results (default: 10)
+  -t, --threshold <number>      Similarity threshold 0-1 (default: 0.7)
+  --config-path <path>          Path to configuration file
+  --no-context                  Hide contextual information in results
+  --format <format>             Output format: table|json|detailed (default: table)
+  --document-id <id>            Search within specific document only
+  --verbose                     Show detailed embedding generation logs
+```
+
+**Examples:**
+```bash
+# Basic search
+zrag search "How does authentication work?"
+
+# Search with more results and lower threshold
+zrag search "machine learning" --limit 20 --threshold 0.5
+
+# Search in JSON format
+zrag search "API endpoints" --format json
+
+# Search within specific document
+zrag search "configuration" --document-id 1
+
+# Detailed search with verbose logging
+zrag search "vector embeddings" --format detailed --verbose
+
+# Hide context information
+zrag search "quick overview" --no-context
+```
+
+#### `zrag server` (Coming Soon)
+Start MCP server for Claude Code integration.
+
+```bash
+zrag server
+```
+
+### 💡 Usage Tips
+
+#### Choosing Parallelism
+- **Default (5)**: Good for most use cases
+- **Low (1-3)**: For API rate limits or system resource constraints
+- **High (10-20)**: For powerful systems and generous API limits
+
+#### Understanding Thresholds
+- **0.9**: Very strict, only highly relevant results
+- **0.7**: Balanced (default), good precision/recall trade-off
+- **0.5**: More permissive, broader results
+- **0.3**: Very broad, may include tangentially related content
+
+#### Dry Run Benefits
+```bash
+# Preview before processing
+zrag add large-document.txt --dry-run --verbose
+
+# Shows:
+# - Estimated API calls and tokens
+# - Chunking strategy results
+# - Processing time estimates
+# - Cost projections
+```
+
+#### Debugging and Troubleshooting
+```bash
+# Maximum verbosity for debugging
+zrag add document.txt --verbose
+
+# Test search with detailed output
+zrag search "test query" --verbose --format detailed
+
+# Database issues
+zrag db-init --test
 ```
 
 ## 📊 Configuration
 
-Configuration is stored in `~/.rag-tool/config.json`:
+Configuration is stored in `~/.zrag/config.json`:
 
 ```json
 {
@@ -107,7 +300,7 @@ Configuration is stored in `~/.rag-tool/config.json`:
     }
   },
   "database": {
-    "path": "/Users/you/.rag-tool/database.db",
+    "path": "/Users/you/.zrag/database.db",
     "vectorDimension": 1536
   },
   "chunking": {
@@ -182,15 +375,6 @@ Each document chunk flows through a complete pipeline:
 - **Integrity Checking**: SHA-256 hashes detect file changes
 - **Lightweight**: Minimal database storage requirements
 
-## 🛠️ Development
-
-This project was "vibe-coded" - meaning it evolved organically through experimentation and iterative improvements rather than rigid planning. The codebase reflects this journey with:
-
-- **Modern TypeScript**: Strict typing and latest language features
-- **Modular Design**: Clean separation of concerns
-- **Comprehensive Logging**: Detailed debugging capabilities
-- **Error Resilience**: Graceful failure handling throughout
-
 ### Build & Test
 
 ```bash
@@ -227,18 +411,9 @@ npm run format
 - Hybrid search (BM25 + vector similarity)
 - REST API server mode
 
-## 🤝 Contributing
-
-This project embraces the "vibe-coding" philosophy:
-
-1. **Experiment Freely**: Try new ideas and see what works
-2. **Iterate Quickly**: Make changes, test, and improve
-3. **Document Discoveries**: Share what you learn along the way
-4. **Maintain Quality**: Keep tests passing and code clean
-
 ## 📄 License
 
-[License information to be added]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 

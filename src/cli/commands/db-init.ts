@@ -7,7 +7,7 @@ import { formatValidationError } from '../utils/validation.js';
 
 export function createDbInitCommand(): Command {
   return new Command('db-init')
-    .description('Initialize the RAG tool database with required schemas and indexes')
+    .description('Initialize the zrag database with required schemas and indexes')
     .option('--config-path <path>', 'Path to configuration file')
     .option('--force', 'Recreate database if it already exists')
     .option('--test', 'Test database operations after initialization')
@@ -26,14 +26,14 @@ async function initializeDatabase(options: {
   force?: boolean; 
   test?: boolean; 
 }): Promise<void> {
-  console.log('💾 RAG Tool Database Initialization');
+  console.log('💾 zrag Database Initialization');
   console.log('');
 
   // Load configuration
   const configManager = new ConfigManager(options.configPath);
   
   if (!configManager.exists()) {
-    console.error('❌ Configuration not found. Run "rag-tool init" first.');
+    console.error('❌ Configuration not found. Run "zrag init" first.');
     process.exit(1);
   }
 
@@ -119,9 +119,9 @@ async function initializeDatabase(options: {
   console.log('✅ Database initialization complete!');
   console.log('');
   console.log('Next steps:');
-  console.log('  1. Add a document: rag-tool add <file>');
-  console.log('  2. Search documents: rag-tool search "<query>"');
-  console.log('  3. Start MCP server: rag-tool server');
+  console.log('  1. Add a document: zrag add <file>');
+  console.log('  2. Search documents: zrag search "<query>"');
+  console.log('  3. Start MCP server: zrag server');
   console.log('');
 
   // Close database connection

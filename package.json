@@ -1,10 +1,10 @@
 {
-  "name": "rag-tool",
+  "name": "zrag",
   "version": "0.1.0",
-  "description": "TypeScript-based RAG tool implementing Anthropic's contextual retrieval methodology with CLI and MCP server capabilities",
+  "description": "zrag - TypeScript-based RAG tool implementing Anthropic's contextual retrieval methodology with CLI and MCP server capabilities",
   "main": "dist/lib/index.js",
   "bin": {
-    "rag-tool": "./dist/cli.js"
+    "zrag": "./dist/cli.js"
   },
   "scripts": {
     "dev": "tsc --watch",

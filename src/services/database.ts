@@ -14,7 +14,7 @@ export class DatabaseService {
 
   private getDefaultDbPath(): string {
     const homeDir = os.homedir();
-    return path.join(homeDir, '.rag-tool', 'database.db');
+    return path.join(homeDir, '.zrag', 'database.db');
   }
 
   /**

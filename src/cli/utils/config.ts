@@ -26,7 +26,7 @@ export class ConfigManager {
 
     // Default to user home directory
     const homeDir = os.homedir();
-    return path.join(homeDir, '.rag-tool');
+    return path.join(homeDir, '.zrag');
   }
 
   /**
@@ -95,7 +95,7 @@ export class ConfigManager {
       return config;
     } catch (error) {
       if ((error as { code?: string }).code === 'ENOENT') {
-        throw new Error('Configuration file not found. Run "rag-tool init" first.');
+        throw new Error('Configuration file not found. Run "zrag init" first.');
       }
       throw new Error(`Failed to load configuration: ${String(error)}`);
     }

@@ -23,7 +23,7 @@ export class ConfigManager {
    */
   private getDefaultConfigDir(): string {
     const homeDir = os.homedir();
-    return path.join(homeDir, '.rag-tool');
+    return path.join(homeDir, '.zrag');
   }
 
   /**
@@ -50,7 +50,7 @@ export class ConfigManager {
   async load(): Promise<RagConfig> {
     try {
       if (!this.exists()) {
-        throw new FileError('Configuration file not found. Run "rag-tool init" to create one.');
+        throw new FileError('Configuration file not found. Run "zrag init" to create one.');
       }
 
       const content = await fs.readFile(this.configPath, 'utf-8');

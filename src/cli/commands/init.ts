@@ -8,7 +8,7 @@ import { validateApiKey, formatValidationError } from '../utils/validation.js';
 
 export function createInitCommand(): Command {
   return new Command('init')
-    .description('Initialize RAG tool configuration with interactive setup')
+    .description('Initialize zrag configuration with interactive setup')
     .option('--config-path <path>', 'Path to configuration file')
     .option('--force', 'Overwrite existing configuration')
     .action(async (options) => {
@@ -22,7 +22,7 @@ export function createInitCommand(): Command {
 }
 
 async function initializeConfiguration(options: { configPath?: string; force?: boolean }): Promise<void> {
-  console.log('🚀 RAG Tool Configuration Setup');
+  console.log('🚀 zrag Configuration Setup');
   console.log('');
 
   const configManager = new ConfigManager(options.configPath);
@@ -40,7 +40,7 @@ async function initializeConfiguration(options: { configPath?: string; force?: b
     }
   }
 
-  console.log('This wizard will help you set up your RAG tool configuration.');
+  console.log('This wizard will help you set up your zrag configuration.');
   console.log('You\'ll need API keys for the AI providers you want to use.');
   console.log('');
 
@@ -114,9 +114,9 @@ async function initializeConfiguration(options: { configPath?: string; force?: b
   console.log('✅ Setup complete!');
   console.log('');
   console.log('Next steps:');
-  console.log('  1. Initialize the database: rag-tool db-init');
-  console.log('  2. Add a document: rag-tool add <file>');
-  console.log('  3. Search documents: rag-tool search "<query>"');
+  console.log('  1. Initialize the database: zrag db-init');
+  console.log('  2. Add a document: zrag add <file>');
+  console.log('  3. Search documents: zrag search "<query>"');
   console.log('');
 }
 

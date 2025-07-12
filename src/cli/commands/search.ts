@@ -41,7 +41,7 @@ export function createSearchCommand(): Command {
         });
         const searchService = new SearchService(db, embeddingService, openaiProvider);
         
-        console.log(`\n🔍 RAG Tool Search\n`);
+        console.log(`\n🔍 zrag Search\n`);
         console.log(`📝 Query: "${query}"`);
         console.log(`🎯 Limit: ${options.limit}`);
         console.log(`📊 Threshold: ${options.threshold}`);
@@ -95,7 +95,7 @@ export function createSearchCommand(): Command {
             console.log(`  • Embedded chunks: ${stats.embeddedChunks}`);
             
             if (stats.embeddedChunks === 0) {
-              console.log('\n⚠️  No embeddings found. Make sure you have added documents with "rag-tool add <file>"');
+              console.log('\n⚠️  No embeddings found. Make sure you have added documents with "zrag add <file>"');
             }
             
             return;
@@ -127,7 +127,7 @@ export function createSearchCommand(): Command {
           if (searchError instanceof Error) {
             if (searchError.message.includes('API key')) {
               console.log('❌ OpenAI API error. Please check your API key configuration.');
-              console.log('💡 Run "rag-tool init" to reconfigure your API settings.');
+              console.log('💡 Run "zrag init" to reconfigure your API settings.');
             } else if (searchError.message.includes('rate limit')) {
               console.log('❌ Rate limit exceeded. Please wait a moment and try again.');
             } else {
@@ -145,9 +145,9 @@ export function createSearchCommand(): Command {
         
         if (error instanceof Error) {
           if (error.message.includes('Configuration not found')) {
-            console.log('❌ Configuration not found. Run "rag-tool init" first.');
+            console.log('❌ Configuration not found. Run "zrag init" first.');
           } else if (error.message.includes('Database not found')) {
-            console.log('❌ Database not found. Run "rag-tool db-init" first.');
+            console.log('❌ Database not found. Run "zrag db-init" first.');
           } else {
             console.log(`❌ Error: ${error.message}`);
           }

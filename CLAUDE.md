@@ -1,4 +1,4 @@
-# RAG Tool - Claude Code Context
+# zrag - Claude Code Context
 
 ## Development Commands
 
@@ -97,6 +97,6 @@ src/
 
 **Always compile and test before finishing tasks**: Run `npm run build` and `npm test` to ensure code quality.
 
-**Database Initialization**: Database auto-creates in `~/.rag-tool/database.db` with proper foreign key constraints and indexing.
+**Database Initialization**: Database auto-creates in `~/.zrag/database.db` with proper foreign key constraints and indexing.
 
 **Error Handling**: Uses typed error classes for different failure modes - essential for debugging processing pipeline issues.

@@ -8,7 +8,7 @@ import { createSearchCommand } from './commands/search.js';
 const program = new Command();
 
 program
-  .name('rag-tool')
+  .name('zrag')
   .description('TypeScript-based RAG tool implementing Anthropic\'s contextual retrieval methodology')
   .version('0.1.0');
 
