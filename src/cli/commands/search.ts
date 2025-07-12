@@ -5,6 +5,7 @@ import { SearchService } from '../../services/search.js';
 import { OpenAIProvider } from '../../providers/openai.js';
 import { ConfigManager } from '../../utils/config.js';
 import { ProgressIndicator } from '../utils/progress.js';
+import { ChunkContentResolver } from '../../utils/chunk-content-resolver.js';
 
 export function createSearchCommand(): Command {
   const command = new Command('search');
@@ -18,6 +19,7 @@ export function createSearchCommand(): Command {
     .option('--no-context', 'Hide contextual information in results')
     .option('--format <format>', 'Output format (table|json|detailed)', 'table')
     .option('--document-id <id>', 'Search within specific document', (value) => parseInt(value, 10))
+    .option('--verbose', 'Show detailed embedding generation logs')
     .action(async (query: string, options) => {
       let progress: ProgressIndicator | undefined;
       
@@ -34,7 +36,9 @@ export function createSearchCommand(): Command {
           config.providers.openai?.apiKey || ''
         );
         
-        const embeddingService = new EmbeddingService(openaiProvider, db);
+        const embeddingService = new EmbeddingService(openaiProvider, db, {
+          verbose: options.verbose || false,
+        });
         const searchService = new SearchService(db, embeddingService, openaiProvider);
         
         console.log(`\n🔍 RAG Tool Search\n`);
@@ -59,15 +63,17 @@ export function createSearchCommand(): Command {
               options.documentId,
               {
                 limit: options.limit,
-                threshold: options.threshold,
+                match_threshold: options.threshold,
                 includeMetadata: true,
+                verbose: options.verbose || false,
               }
             );
           } else {
             searchResponse = await searchService.search(query, {
               limit: options.limit,
-              threshold: options.threshold,
+              match_threshold: options.threshold,
               includeMetadata: true,
+              verbose: options.verbose || false,
             });
           }
           
@@ -98,18 +104,20 @@ export function createSearchCommand(): Command {
           // Format and display results
           console.log(`✅ Found ${searchResponse.results.length} results in ${searchResponse.executionTime}ms\n`);
           
+          const contentResolver = new ChunkContentResolver();
+          
           switch (options.format) {
             case 'json':
               console.log(JSON.stringify(searchResponse, null, 2));
               break;
               
             case 'detailed':
-              displayDetailedResults(searchResponse, options.context);
+              await displayDetailedResults(searchResponse, options.context, contentResolver);
               break;
               
             case 'table':
             default:
-              displayTableResults(searchResponse, options.context);
+              await displayTableResults(searchResponse, options.context, contentResolver);
               break;
           }
           
@@ -154,7 +162,7 @@ export function createSearchCommand(): Command {
   return command;
 }
 
-function displayTableResults(searchResponse: any, showContext: boolean = true): void {
+async function displayTableResults(searchResponse: any, showContext: boolean = true, contentResolver?: ChunkContentResolver): Promise<void> {
   console.log('📋 Search Results:\n');
   
   for (let i = 0; i < searchResponse.results.length; i++) {
@@ -169,7 +177,18 @@ function displayTableResults(searchResponse: any, showContext: boolean = true): 
       console.log(`   📝 Context: ${truncateText(result.chunk.contextualized_text, 100)}`);
     }
     
-    console.log(`   📖 Content: ${truncateText(result.chunk.original_text, 200)}`);
+    // Resolve chunk content
+    if (contentResolver) {
+      try {
+        const chunkText = await contentResolver.getChunkText(result.document, result.chunk);
+        console.log(`   📖 Content: ${chunkText}`);
+      } catch (error) {
+        console.log(`   📖 Content: [Content unavailable]`);
+      }
+    } else {
+      console.log(`   📖 Content: [Content resolver not available]`);
+    }
+    
     console.log();
   }
   
@@ -178,7 +197,7 @@ function displayTableResults(searchResponse: any, showContext: boolean = true): 
   console.log(`📊 Total results: ${searchResponse.totalResults}`);
 }
 
-function displayDetailedResults(searchResponse: any, showContext: boolean = true): void {
+async function displayDetailedResults(searchResponse: any, showContext: boolean = true, contentResolver?: ChunkContentResolver): Promise<void> {
   console.log('📋 Detailed Search Results:\n');
   
   for (let i = 0; i < searchResponse.results.length; i++) {
@@ -198,7 +217,16 @@ function displayDetailedResults(searchResponse: any, showContext: boolean = true
     }
     
     console.log(`\n📖 Content:`);
-    console.log(wrapText(result.chunk.original_text, 80, '   '));
+    if (contentResolver) {
+      try {
+        const chunkText = await contentResolver.getChunkText(result.document, result.chunk);
+        console.log(wrapText(chunkText, 80, '   '));
+      } catch (error) {
+        console.log('   [Content unavailable]');
+      }
+    } else {
+      console.log('   [Content resolver not available]');
+    }
     
     console.log(`\n🔗 Chunk Position: ${result.chunk.start_position}-${result.chunk.end_position}`);
     console.log(`✅ Status: ${result.chunk.status}`);

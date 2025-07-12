@@ -6,8 +6,9 @@ import { ValidationError } from '../utils/errors.js';
 
 export interface SearchOptions {
   limit?: number;
-  threshold?: number;
+  match_threshold?: number;
   includeMetadata?: boolean;
+  verbose?: boolean;
 }
 
 export interface SearchResult {
@@ -55,18 +56,33 @@ export class SearchService {
 
     const opts = {
       limit: 10,
-      threshold: 0.7,
+      match_threshold: 0.7,
       includeMetadata: true,
       ...options,
     };
 
     try {
       // Generate query embedding
+      if (opts.verbose) {
+        console.log(`\n🔍 [VERBOSE] Query Embedding Generation:`);
+        console.log(`  📝 Query: "${query.trim()}"`);
+        console.log(`  📏 Query length: ${query.trim().length} chars`);
+        console.log(`  🎯 Model: text-embedding-3-small`);
+        console.log(`  📊 Est. tokens: ${Math.ceil(query.trim().length / 4)}`);
+        console.log(`  📤 Sending embedding request...`);
+      }
+
       const queryEmbedding = await this.openaiProvider.generateEmbedding(query.trim());
+
+      if (opts.verbose) {
+        console.log(`  📥 Query embedding received:`);
+        console.log(`  📐 Dimensions: ${queryEmbedding.length}`);
+        console.log(`  ✅ Success: Generated ${queryEmbedding.length}d query vector`);
+      }
 
       // For now, implement basic similarity search until vector extension is available
       // This is a placeholder implementation
-      const results = this.db.searchSimilarChunks(queryEmbedding, opts.limit, opts.threshold);
+      const results = this.db.searchSimilarChunks(queryEmbedding, opts.limit, opts.match_threshold);
 
       const executionTime = Date.now() - startTime;
 
@@ -142,11 +158,11 @@ export class SearchService {
 
     const opts = {
       limit: 10,
-      threshold: 0.7,
+      match_threshold: 0.7,
       ...options,
     };
 
-    return this.db.searchSimilarChunks(embedding, opts.limit, opts.threshold);
+    return this.db.searchSimilarChunks(embedding, opts.limit, opts.match_threshold);
   }
 
   /**
@@ -164,20 +180,37 @@ export class SearchService {
       throw new ValidationError(`Document with ID ${documentId} not found`);
     }
 
+    const opts = {
+      limit: 10,
+      match_threshold: 0.7,
+      ...options,
+    };
+
+    // Generate query embedding with verbose logging
+    if (opts.verbose) {
+      console.log(`\n🔍 [VERBOSE] Query Embedding Generation (Document ${documentId}):`);
+      console.log(`  📝 Query: "${query.trim()}"`);
+      console.log(`  📏 Query length: ${query.trim().length} chars`);
+      console.log(`  🎯 Model: text-embedding-3-small`);
+      console.log(`  📊 Est. tokens: ${Math.ceil(query.trim().length / 4)}`);
+      console.log(`  📤 Sending embedding request...`);
+    }
+
     const queryEmbedding = await this.openaiProvider.generateEmbedding(query.trim());
+
+    if (opts.verbose) {
+      console.log(`  📥 Query embedding received:`);
+      console.log(`  📐 Dimensions: ${queryEmbedding.length}`);
+      console.log(`  ✅ Success: Generated ${queryEmbedding.length}d query vector`);
+    }
+
     const allResults = this.db.searchSimilarChunks(queryEmbedding, 1000, 0);
     
     // Filter results to only include chunks from the specified document
     const documentResults = allResults.filter(result => result.document.id === documentId);
-    
-    const opts = {
-      limit: 10,
-      threshold: 0.7,
-      ...options,
-    };
 
     const filteredResults = documentResults
-      .filter(result => result.similarity_score >= opts.threshold!)
+      .filter(result => result.similarity_score >= opts.match_threshold!)
       .slice(0, opts.limit);
 
     const executionTime = Date.now() - startTime;

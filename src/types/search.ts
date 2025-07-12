@@ -1,7 +1,7 @@
 export interface SearchQuery {
   query: string;
   limit?: number;
-  threshold?: number;
+  match_threshold?: number;
   filters?: SearchFilters;
 }
 

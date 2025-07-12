@@ -229,7 +229,9 @@ export class ChunkProcessingService {
           console.log(`    🔢 Step 2: Generating embedding...`);
         }
 
-        const embeddingResult = await this.embeddingService.generateEmbedding(document, chunk);
+        const embeddingResult = await this.embeddingService.generateEmbedding(document, chunk, {
+          verbose: options.verbose || false,
+        });
 
         if (embeddingResult.success) {
           embeddingGenerated = true;

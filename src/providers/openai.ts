@@ -101,7 +101,9 @@ Here is the chunk we want to situate within the whole document
 <chunk>
 ${chunk}
 </chunk>
-Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else.`;
+Please give a short succinct context to situate this chunk within the overall document for the purposes of improving 
+search retrieval of the chunk. Answer only with the succinct context and nothing else. Use the original language of the 
+text, and don't start the summary with something like 'This chunk contains...'. Go directly to the summary.`;
 
     try {
       const response = await this.withRetry(() =>

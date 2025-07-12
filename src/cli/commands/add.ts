@@ -22,6 +22,7 @@ export function createAddCommand(): Command {
     .option('--dry-run', 'Show what would be done without actually processing')
     .option('--verbose', 'Show detailed logs including chunking details and API requests/responses')
     .option('--max-parallel <number>', 'Maximum number of chunks to process in parallel (default: 5)', '5')
+    .option('--rebuild-vector-index', 'Rebuild the vector index from existing embeddings (fixes corrupted vector data)')
     .action(async (file, options) => {
       try {
         await addDocument(file, options);
@@ -108,6 +109,7 @@ async function addDocument(
   const embeddingService = new EmbeddingService(openaiProvider, dbService, {
     provider: 'openai',
     model: config.providers.openai?.embeddingModel || 'text-embedding-3-small',
+    verbose: options.verbose || false,
   });
 
   const chunkProcessingService = new ChunkProcessingService(

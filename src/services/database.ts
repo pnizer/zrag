@@ -144,9 +144,20 @@ export class DatabaseService {
     if (!this.db) throw new DatabaseError('Database not initialized');
 
     try {
+      // Check if vector table already exists
+      const tableExists = this.db.prepare(`
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='vector_index'
+      `).get();
+
+      if (tableExists) {
+        console.log('Vector table already exists');
+        return;
+      }
+      
       // Create virtual table for vector search (1536 dimensions for OpenAI text-embedding-3-small)
       this.db.exec(`
-        CREATE VIRTUAL TABLE IF NOT EXISTS vector_index USING vss0(
+        CREATE VIRTUAL TABLE vector_index USING vss0(
           embedding(1536)
         )
       `);
@@ -413,10 +424,10 @@ export class DatabaseService {
         const embeddingId = result.lastInsertRowid as number;
         
         // Convert BLOB back to array for vector index
-        const embeddingArray = Array.from(new Float32Array(embedding.embedding as ArrayBuffer));
+        const embeddingArray = Array.from(new Float32Array(embedding.embedding.buffer));
         
         // Insert into vector index
-        this.insertEmbeddingIntoVectorIndex(embeddingId, embeddingArray);
+        this.insertEmbeddingIntoVectorIndex(embedding.chunk_id, embeddingArray);
         
         return this.getEmbeddingById(embeddingId)!;
       });
@@ -458,7 +469,7 @@ export class DatabaseService {
   /**
    * Vector similarity search using sqlite-vss
    */
-  searchSimilarChunks(queryEmbedding: number[], limit: number = 10, threshold: number = 0.7): Array<{
+  searchSimilarChunks(queryEmbedding: number[], limit: number = 10, match_threshold: number = 0.7): Array<{
     chunk: Chunk;
     document: Document;
     similarity_score: number;
@@ -468,6 +479,9 @@ export class DatabaseService {
     try {
       // Convert embedding to the format expected by sqlite-vss
       const embeddingBlob = Buffer.from(new Float32Array(queryEmbedding).buffer);
+      
+      // Get more results than requested to allow for threshold filtering
+      const searchLimit = Math.max(limit * 3, 50);
       
       const stmt = db.prepare(`
         SELECT 
@@ -481,19 +495,40 @@ export class DatabaseService {
           d.last_error,
           d.created_at as document_created_at,
           v.distance
-        FROM vector_index v
-        JOIN embeddings e ON e.rowid = v.rowid
+        FROM (
+          SELECT rowid, distance 
+          FROM vector_index 
+          WHERE vss_search(embedding, ?)
+          LIMIT ?
+        ) v
+        JOIN embeddings e ON e.id = v.rowid
         JOIN chunks c ON c.id = e.chunk_id
         JOIN documents d ON d.id = c.document_id
-        WHERE v.embedding MATCH ?
-          AND v.distance <= ?
         ORDER BY v.distance
-        LIMIT ?
       `);
       
-      const results = stmt.all(embeddingBlob, 1 - threshold, limit) as any[];
+      const allResults = stmt.all(embeddingBlob, searchLimit) as any[];
       
-      return results.map(row => ({
+      // Calculate similarity scores and apply threshold filtering
+      const resultsWithSimilarity = allResults.map(row => {
+        // Convert L2 (squared Euclidean) distance to similarity score (0-1, where 1 is perfect match)
+        // sqlite-vss with default Faiss "Flat,IDMap2" returns L2 squared distance
+        // Formula: similarity = 1 / (1 + distance)
+        // This provides a smooth decay where distance 0 = similarity 1, and higher distances approach 0
+        const similarity = Math.max(0, Math.min(1, 1 / (1 + row.distance)));
+
+        return {
+          ...row,
+          similarity_score: similarity
+        };
+      });
+      
+      // Filter by threshold and limit results (Cloudflare AutoRAG style - strict filtering, no fallback)
+      const filteredResults = resultsWithSimilarity
+        .filter(row => row.similarity_score >= match_threshold)
+        .slice(0, limit);
+      
+      return filteredResults.map(row => ({
         chunk: {
           id: row.id,
           document_id: row.document_id,
@@ -521,7 +556,7 @@ export class DatabaseService {
           created_at: row.document_created_at,
           updated_at: row.document_created_at
         } as Document,
-        similarity_score: 1 - row.distance // Convert distance to similarity
+        similarity_score: row.similarity_score
       }));
     } catch (error) {
       throw new DatabaseError(`Failed to search similar chunks: ${String(error)}`);
@@ -531,19 +566,27 @@ export class DatabaseService {
   /**
    * Insert embedding into vector index
    */
-  insertEmbeddingIntoVectorIndex(embeddingId: number, embedding: number[]): void {
+  insertEmbeddingIntoVectorIndex(chunkId: number, embedding: number[]): void {
     const db = this.getDb();
     
     try {
       // Convert embedding to the format expected by sqlite-vss
       const embeddingBlob = Buffer.from(new Float32Array(embedding).buffer);
       
+      // First get the embedding ID that was just inserted
+      const embeddingStmt = db.prepare('SELECT id FROM embeddings WHERE chunk_id = ? ORDER BY id DESC LIMIT 1');
+      const embeddingRecord = embeddingStmt.get(chunkId) as { id: number } | undefined;
+      
+      if (!embeddingRecord) {
+        throw new Error('Failed to find embedding record for chunk');
+      }
+      
       const stmt = db.prepare(`
         INSERT INTO vector_index (rowid, embedding)
         VALUES (?, ?)
       `);
       
-      stmt.run(embeddingId, embeddingBlob);
+      stmt.run(embeddingRecord.id, embeddingBlob);
     } catch (error) {
       throw new DatabaseError(`Failed to insert embedding into vector index: ${String(error)}`);
     }

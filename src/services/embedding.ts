@@ -9,6 +9,7 @@ export interface EmbeddingOptions {
   model?: string;
   batchSize?: number;
   maxRetries?: number;
+  verbose?: boolean;
 }
 
 export interface EmbeddingResult {
@@ -63,7 +64,23 @@ export class EmbeddingService {
         throw new ValidationError('Chunk text is empty');
       }
 
+      if (opts.verbose) {
+        console.log(`\n🔢 [VERBOSE] Embedding Generation for Chunk ${chunk.chunk_index + 1}:`);
+        console.log(`  📄 Document: ${document.filename}`);
+        console.log(`  📄 Text: ${textToEmbed}`);
+        console.log(`  📏 Text length: ${textToEmbed.length} chars`);
+        console.log(`  🎯 Model: ${opts.model}`);
+        console.log(`  📊 Est. tokens: ${this.estimateTokens(textToEmbed)}`);
+        console.log(`  📤 Sending embedding request...`);
+      }
+
       const embedding = await this.openaiProvider.generateEmbedding(textToEmbed, opts.model);
+
+      if (opts.verbose) {
+        console.log(`  📥 Embedding received:`);
+        console.log(`  📐 Dimensions: ${embedding.length}`);
+        console.log(`  ✅ Success: Generated ${embedding.length}d vector`);
+      }
 
       return {
         chunkId: chunk.id,
