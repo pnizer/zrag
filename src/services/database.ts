@@ -48,14 +48,16 @@ export class DatabaseService {
     if (!this.db) throw new DatabaseError('Database not initialized');
 
     try {
-      // Documents table with processing status tracking
+      // Documents table with file reference tracking (no content storage)
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS documents (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           filename TEXT NOT NULL,
           filepath TEXT NOT NULL,
-          content TEXT NOT NULL,
-          content_hash TEXT NOT NULL UNIQUE,
+          file_hash TEXT NOT NULL UNIQUE,
+          file_size INTEGER NOT NULL,
+          file_modified DATETIME,
+          text_encoding TEXT DEFAULT 'utf-8',
           total_chunks INTEGER NOT NULL DEFAULT 0,
           processed_chunks INTEGER DEFAULT 0,
           status TEXT NOT NULL DEFAULT 'pending',
@@ -65,16 +67,15 @@ export class DatabaseService {
         )
       `);
 
-      // Chunks table with detailed processing status
+      // Chunks table with position indices only (no text content)
       this.db.exec(`
         CREATE TABLE IF NOT EXISTS chunks (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           document_id INTEGER NOT NULL,
           chunk_index INTEGER NOT NULL,
-          original_text TEXT NOT NULL,
-          contextualized_text TEXT,
           start_position INTEGER NOT NULL,
           end_position INTEGER NOT NULL,
+          chunk_length INTEGER NOT NULL,
           status TEXT NOT NULL DEFAULT 'pending',
           error_message TEXT,
           processing_step TEXT,
@@ -99,7 +100,8 @@ export class DatabaseService {
       // Create indexes for performance
       this.db.exec(`
         CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
-        CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(file_hash);
+        CREATE INDEX IF NOT EXISTS idx_documents_filepath ON documents(filepath);
         CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
         CREATE INDEX IF NOT EXISTS idx_chunks_status ON chunks(status);
         CREATE INDEX IF NOT EXISTS idx_embeddings_chunk ON embeddings(chunk_id);
@@ -201,15 +203,17 @@ export class DatabaseService {
     
     try {
       const stmt = db.prepare(`
-        INSERT INTO documents (filename, filepath, content, content_hash, total_chunks, processed_chunks, status, last_error)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO documents (filename, filepath, file_hash, file_size, file_modified, text_encoding, total_chunks, processed_chunks, status, last_error)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       
       const result = stmt.run(
         doc.filename,
         doc.filepath,
-        doc.content,
-        doc.content_hash,
+        doc.file_hash,
+        doc.file_size,
+        doc.file_modified,
+        doc.text_encoding,
         doc.total_chunks,
         doc.processed_chunks,
         doc.status,
@@ -238,17 +242,32 @@ export class DatabaseService {
   }
 
   /**
-   * Get document by content hash
+   * Get document by file hash
    */
-  getDocumentByHash(contentHash: string): Document | null {
+  getDocumentByHash(fileHash: string): Document | null {
     const db = this.getDb();
     
     try {
-      const stmt = db.prepare('SELECT * FROM documents WHERE content_hash = ?');
-      const result = stmt.get(contentHash) as Document | undefined;
+      const stmt = db.prepare('SELECT * FROM documents WHERE file_hash = ?');
+      const result = stmt.get(fileHash) as Document | undefined;
       return result || null;
     } catch (error) {
       throw new DatabaseError(`Failed to get document by hash: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Get document by file path
+   */
+  getDocumentByPath(filepath: string): Document | null {
+    const db = this.getDb();
+    
+    try {
+      const stmt = db.prepare('SELECT * FROM documents WHERE filepath = ?');
+      const result = stmt.get(filepath) as Document | undefined;
+      return result || null;
+    } catch (error) {
+      throw new DatabaseError(`Failed to get document by path: ${String(error)}`);
     }
   }
 
@@ -297,17 +316,16 @@ export class DatabaseService {
     
     try {
       const stmt = db.prepare(`
-        INSERT INTO chunks (document_id, chunk_index, original_text, contextualized_text, start_position, end_position, status, error_message, processing_step)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO chunks (document_id, chunk_index, start_position, end_position, chunk_length, status, error_message, processing_step)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
       
       const result = stmt.run(
         chunk.document_id,
         chunk.chunk_index,
-        chunk.original_text,
-        chunk.contextualized_text,
         chunk.start_position,
         chunk.end_position,
+        chunk.chunk_length,
         chunk.status,
         chunk.error_message,
         chunk.processing_step
@@ -456,8 +474,10 @@ export class DatabaseService {
           c.*,
           d.filename,
           d.filepath,
-          d.content as document_content,
-          d.content_hash,
+          d.file_hash,
+          d.file_size,
+          d.file_modified,
+          d.text_encoding,
           d.last_error,
           d.created_at as document_created_at,
           v.distance
@@ -478,10 +498,9 @@ export class DatabaseService {
           id: row.id,
           document_id: row.document_id,
           chunk_index: row.chunk_index,
-          original_text: row.original_text,
-          contextualized_text: row.contextualized_text,
           start_position: row.start_position,
           end_position: row.end_position,
+          chunk_length: row.chunk_length,
           status: row.status,
           error_message: row.error_message,
           processing_step: row.processing_step,
@@ -491,8 +510,10 @@ export class DatabaseService {
           id: row.document_id,
           filename: row.filename,
           filepath: row.filepath,
-          content: row.document_content,
-          content_hash: row.content_hash,
+          file_hash: row.file_hash,
+          file_size: row.file_size,
+          file_modified: row.file_modified,
+          text_encoding: row.text_encoding,
           total_chunks: 0, // Will be filled by calling code if needed
           processed_chunks: 0, // Will be filled by calling code if needed
           status: 'complete', // Assume complete since we're searching

@@ -97,7 +97,7 @@ export class TextChunker {
     
     while (i < sentences.length) {
       let currentChunk = '';
-      let startPos = sentences[i]!.startPosition;
+      const startPos = sentences[i]!.startPosition;
       let endPos = startPos;
       
       // Build chunk by adding sentences until we hit the size limit

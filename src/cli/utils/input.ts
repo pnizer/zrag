@@ -48,6 +48,7 @@ export async function promptSecure(question: string): Promise<string> {
           process.stdin.removeListener('data', onData);
           rl.close();
           process.exit(1);
+          // eslint-disable-next-line no-fallthrough
         case '\u007f': // Backspace
           if (input.length > 0) {
             input = input.slice(0, -1);

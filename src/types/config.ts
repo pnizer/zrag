@@ -36,6 +36,10 @@ Here is the chunk we want to situate within the whole document
 </chunk>
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else.`),
   }),
+  processing: z.object({
+    maxParallelChunks: z.number().min(1).max(20).default(5),
+    enableLinearProcessing: z.boolean().default(true),
+  }).optional(),
 });
 
 export type RagConfig = z.infer<typeof RagConfigSchema>;
@@ -62,5 +66,9 @@ Please give a short succinct context to situate this chunk within the overall do
   database: {
     path: '', // Will be set dynamically by ConfigManager
     vectorDimension: 1536,
+  },
+  processing: {
+    maxParallelChunks: 5,
+    enableLinearProcessing: true,
   },
 };

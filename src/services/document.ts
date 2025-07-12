@@ -1,15 +1,19 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { DatabaseService } from './database.js';
 import { TextChunker, ChunkingOptions } from '../utils/chunking.js';
 import { TextProcessor } from '../utils/text-processing.js';
 import { Document, Chunk } from '../types/document.js';
 import { FileError, ValidationError } from '../utils/errors.js';
+import { ChunkContentResolver } from '../utils/chunk-content-resolver.js';
 
 export interface DocumentProcessingOptions {
   chunking: ChunkingOptions;
   validateContent?: boolean;
   extractMetadata?: boolean;
+  dryRun?: boolean;
+  verbose?: boolean;
 }
 
 export interface DocumentProcessingResult {
@@ -22,14 +26,23 @@ export interface DocumentProcessingResult {
     language?: string;
     hasStructure: boolean;
   } | undefined;
+  dryRun?: boolean;
+  analysis?: {
+    avgChunkSize: number;
+    minChunkSize: number;
+    maxChunkSize: number;
+    totalOverlap: number;
+  };
 }
 
 export class DocumentService {
   private db: DatabaseService;
   private defaultOptions: DocumentProcessingOptions;
+  private chunkResolver: ChunkContentResolver;
 
   constructor(db: DatabaseService, options?: Partial<DocumentProcessingOptions>) {
     this.db = db;
+    this.chunkResolver = new ChunkContentResolver();
     this.defaultOptions = {
       chunking: {
         strategy: 'sentence',
@@ -92,49 +105,134 @@ export class DocumentService {
         }
       }
 
-      // Generate content hash for deduplication
-      const contentHash = TextProcessor.generateContentHash(extractedText);
+      // Get file statistics and generate hash
+      const stats = await fs.stat(filepath);
+      const fileContent = await fs.readFile(filepath);
+      const fileHash = crypto.createHash('sha256').update(fileContent).digest('hex');
 
-      // Check if document already exists
-      const existingDoc = this.db.getDocumentByHash(contentHash);
-      if (existingDoc) {
-        const chunks = this.db.getChunksByDocumentId(existingDoc.id);
-        return {
-          document: existingDoc,
-          chunks,
-          metadata: processingOptions.extractMetadata
-            ? TextProcessor.extractMetadata(extractedText)
-            : undefined,
-        };
+      // Check if document already exists by file hash (only in non-dry-run mode)
+      if (!processingOptions.dryRun) {
+        const existingDoc = this.db.getDocumentByHash(fileHash);
+        if (existingDoc) {
+          const chunks = this.db.getChunksByDocumentId(existingDoc.id);
+          return {
+            document: existingDoc,
+            chunks,
+            metadata: processingOptions.extractMetadata
+              ? TextProcessor.extractMetadata(extractedText)
+              : undefined,
+          };
+        }
       }
 
       // Validate chunking options
       TextChunker.validateOptions(processingOptions.chunking);
 
       // Create chunker and split text
+      if (processingOptions.verbose) {
+        console.log('\n🔍 [VERBOSE] Chunking Details:');
+        console.log(`  📄 Input text length: ${extractedText.length} characters`);
+        console.log(`  ⚙️  Strategy: ${processingOptions.chunking.strategy}`);
+        console.log(`  📏 Chunk size: ${processingOptions.chunking.chunkSize}`);
+        console.log(`  🔄 Overlap: ${processingOptions.chunking.overlap}`);
+        console.log('  🔄 Starting chunking process...');
+      }
+      
       const chunker = new TextChunker(processingOptions.chunking);
       const textChunks = chunker.chunk(extractedText);
+      
+      if (processingOptions.verbose) {
+        console.log(`  ✅ Chunking complete: ${textChunks.length} chunks created`);
+        console.log('\n🔍 [VERBOSE] Chunk Details:');
+        textChunks.slice(0, 3).forEach((chunk, index) => {
+          console.log(`  📝 Chunk ${index + 1}:`);
+          console.log(`    Position: ${chunk.startPosition}-${chunk.endPosition}`);
+          console.log(`    Length: ${chunk.text.length} chars`);
+          console.log(`    Preview: "${chunk.text.substring(0, 100)}${chunk.text.length > 100 ? '...' : ''}`);
+        });
+        if (textChunks.length > 3) {
+          console.log(`   ... and ${textChunks.length - 3} more chunks`);
+        }
+      }
 
-      // Create document record
+      // Calculate analysis statistics for both dry-run and normal mode
+      const chunkSizes = textChunks.map(chunk => chunk.text.length);
+      const avgChunkSize = chunkSizes.reduce((sum, size) => sum + size, 0) / chunkSizes.length;
+      const minChunkSize = Math.min(...chunkSizes);
+      const maxChunkSize = Math.max(...chunkSizes);
+      const totalContentInChunks = chunkSizes.reduce((sum, size) => sum + size, 0);
+      const totalOverlap = Math.max(0, totalContentInChunks - extractedText.length);
+
+      const analysis = {
+        avgChunkSize,
+        minChunkSize,
+        maxChunkSize,
+        totalOverlap,
+      };
+
+      // In dry-run mode, create a mock document without database operations
+      if (processingOptions.dryRun) {
+        const mockDocument: Document = {
+          id: 0, // Mock ID for dry run
+          filename,
+          filepath,
+          file_hash: fileHash,
+          file_size: stats.size,
+          file_modified: stats.mtime.toISOString(),
+          text_encoding: 'utf-8',
+          total_chunks: textChunks.length,
+          processed_chunks: 0,
+          status: 'pending',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        // Create mock chunks for dry run
+        const mockChunks: Chunk[] = textChunks.map(textChunk => ({
+          id: textChunk.index, // Mock ID
+          document_id: 0, // Mock document ID
+          chunk_index: textChunk.index,
+          start_position: textChunk.startPosition,
+          end_position: textChunk.endPosition,
+          chunk_length: textChunk.text.length,
+          status: 'pending',
+          processing_step: 'chunking',
+          created_at: new Date().toISOString(),
+        }));
+
+        return {
+          document: mockDocument,
+          chunks: mockChunks,
+          metadata: processingOptions.extractMetadata
+            ? TextProcessor.extractMetadata(extractedText)
+            : undefined,
+          dryRun: true,
+          analysis,
+        };
+      }
+
+      // Normal mode: create actual database records
       const document = this.db.insertDocument({
         filename,
         filepath,
-        content: extractedText,
-        content_hash: contentHash,
+        file_hash: fileHash,
+        file_size: stats.size,
+        file_modified: stats.mtime.toISOString(),
+        text_encoding: 'utf-8',
         total_chunks: textChunks.length,
         processed_chunks: 0,
         status: 'pending',
       });
 
-      // Create chunk records
+      // Create chunk records with position indices only
       const chunks: Chunk[] = [];
       for (const textChunk of textChunks) {
         const chunk = this.db.insertChunk({
           document_id: document.id,
           chunk_index: textChunk.index,
-          original_text: textChunk.text,
           start_position: textChunk.startPosition,
           end_position: textChunk.endPosition,
+          chunk_length: textChunk.text.length,
           status: 'pending',
           processing_step: 'chunking' as 'chunking',
         });
@@ -153,6 +251,7 @@ export class DocumentService {
         metadata: processingOptions.extractMetadata
           ? TextProcessor.extractMetadata(extractedText)
           : undefined,
+        analysis,
       };
     } catch (error) {
       if (error instanceof ValidationError || error instanceof FileError) {
@@ -173,10 +272,13 @@ export class DocumentService {
 
     const chunks = this.db.getChunksByDocumentId(documentId);
 
+    // Get document content from file for metadata extraction
+    const documentContent = await this.chunkResolver.getDocumentContent(document);
+
     return {
       document,
       chunks,
-      metadata: TextProcessor.extractMetadata(document.content),
+      metadata: TextProcessor.extractMetadata(documentContent),
     };
   }
 
@@ -191,10 +293,13 @@ export class DocumentService {
 
     const chunks = this.db.getChunksByDocumentId(documentId);
 
+    // Get document content from file for metadata extraction
+    const documentContent = await this.chunkResolver.getDocumentContent(document);
+
     return {
       document,
       chunks,
-      metadata: TextProcessor.extractMetadata(document.content),
+      metadata: TextProcessor.extractMetadata(documentContent),
     };
   }
 
@@ -269,10 +374,10 @@ export class DocumentService {
 
   /**
    * Mark chunk as contextualized
+   * Note: In file-reference mode, we don't store contextualized text in the database
    */
-  async setChunkContext(chunkId: number, contextualizedText: string): Promise<Chunk | null> {
+  async setChunkContext(chunkId: number, _contextualizedText: string): Promise<Chunk | null> {
     return this.db.updateChunk(chunkId, {
-      contextualized_text: contextualizedText,
       status: 'contextualized',
       processing_step: 'context_generation',
     });
@@ -371,5 +476,71 @@ export class DocumentService {
     }
 
     return stats;
+  }
+
+  /**
+   * Get text content for a specific chunk
+   */
+  async getChunkText(documentId: number, chunkId: number): Promise<string> {
+    const document = this.db.getDocumentById(documentId);
+    if (!document) {
+      throw new ValidationError(`Document with ID ${documentId} not found`);
+    }
+
+    const chunk = this.db.getChunkById(chunkId);
+    if (!chunk || chunk.document_id !== documentId) {
+      throw new ValidationError(`Chunk with ID ${chunkId} not found in document ${documentId}`);
+    }
+
+    return await this.chunkResolver.getChunkText(document, chunk);
+  }
+
+  /**
+   * Get text content for multiple chunks from the same document
+   */
+  async getMultipleChunkTexts(documentId: number, chunkIds: number[]): Promise<{ chunkId: number; text: string }[]> {
+    const document = this.db.getDocumentById(documentId);
+    if (!document) {
+      throw new ValidationError(`Document with ID ${documentId} not found`);
+    }
+
+    const chunks = chunkIds.map(id => {
+      const chunk = this.db.getChunkById(id);
+      if (!chunk || chunk.document_id !== documentId) {
+        throw new ValidationError(`Chunk with ID ${id} not found in document ${documentId}`);
+      }
+      return chunk;
+    });
+
+    const chunkContents = await this.chunkResolver.resolveMultipleChunks(document, chunks);
+    
+    return chunkContents.map(content => ({
+      chunkId: content.chunk.id,
+      text: content.text
+    }));
+  }
+
+  /**
+   * Get full document content from file
+   */
+  async getFullDocumentContent(documentId: number): Promise<string> {
+    const document = this.db.getDocumentById(documentId);
+    if (!document) {
+      throw new ValidationError(`Document with ID ${documentId} not found`);
+    }
+
+    return await this.chunkResolver.getDocumentContent(document);
+  }
+
+  /**
+   * Validate that a document's file is still accessible and unchanged
+   */
+  async validateDocumentFile(documentId: number): Promise<{ valid: boolean; reason?: string }> {
+    const document = this.db.getDocumentById(documentId);
+    if (!document) {
+      throw new ValidationError(`Document with ID ${documentId} not found`);
+    }
+
+    return await this.chunkResolver.validateFileIntegrity(document);
   }
 }

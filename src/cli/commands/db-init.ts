@@ -193,8 +193,10 @@ async function testDatabaseOperations(dbService: DatabaseService): Promise<void>
     const testDoc = dbService.insertDocument({
       filename: 'test.txt',
       filepath: '/tmp/test.txt',
-      content: 'This is a test document for database verification.',
-      content_hash: 'test-hash-123',
+      file_hash: 'test-hash-123',
+      file_size: 49,
+      file_modified: new Date().toISOString(),
+      text_encoding: 'utf-8',
       total_chunks: 1,
       processed_chunks: 0,
       status: 'pending',
@@ -204,9 +206,9 @@ async function testDatabaseOperations(dbService: DatabaseService): Promise<void>
     const testChunk = dbService.insertChunk({
       document_id: testDoc.id,
       chunk_index: 0,
-      original_text: 'This is a test document for database verification.',
       start_position: 0,
       end_position: 49,
+      chunk_length: 49,
       status: 'pending',
       processing_step: 'chunking',
     });

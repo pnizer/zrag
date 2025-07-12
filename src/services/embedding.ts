@@ -1,7 +1,8 @@
 import { OpenAIProvider } from '../providers/openai.js';
 import { DatabaseService } from './database.js';
-import { Chunk } from '../types/document.js';
+import { Document, Chunk } from '../types/document.js';
 import { ValidationError } from '../utils/errors.js';
+import { ChunkContentResolver } from '../utils/chunk-content-resolver.js';
 
 export interface EmbeddingOptions {
   provider: 'openai';
@@ -29,10 +30,12 @@ export class EmbeddingService {
   private openaiProvider: OpenAIProvider;
   private db: DatabaseService;
   private defaultOptions: EmbeddingOptions;
+  private chunkResolver: ChunkContentResolver;
 
   constructor(openaiProvider: OpenAIProvider, db: DatabaseService, options?: Partial<EmbeddingOptions>) {
     this.openaiProvider = openaiProvider;
     this.db = db;
+    this.chunkResolver = new ChunkContentResolver();
     this.defaultOptions = {
       provider: 'openai',
       model: 'text-embedding-3-small',
@@ -46,14 +49,15 @@ export class EmbeddingService {
    * Generate embedding for a single chunk
    */
   async generateEmbedding(
+    document: Document,
     chunk: Chunk,
     options?: Partial<EmbeddingOptions>
   ): Promise<EmbeddingResult> {
     const opts = { ...this.defaultOptions, ...options };
     
     try {
-      // Use contextualized text if available, otherwise use original text
-      const textToEmbed = chunk.contextualized_text || chunk.original_text;
+      // Get chunk text from file
+      const textToEmbed = await this.chunkResolver.getChunkText(document, chunk);
       
       if (!textToEmbed || textToEmbed.trim().length === 0) {
         throw new ValidationError('Chunk text is empty');
@@ -82,6 +86,7 @@ export class EmbeddingService {
    * Generate embeddings for multiple chunks with batch processing
    */
   async generateEmbeddingsForChunks(
+    document: Document,
     chunks: Chunk[],
     options?: Partial<EmbeddingOptions>
   ): Promise<BatchEmbeddingResult> {
@@ -98,8 +103,7 @@ export class EmbeddingService {
 
     // Filter chunks that need embeddings
     const pendingChunks = chunks.filter(chunk => 
-      !this.db.getEmbeddingByChunkId(chunk.id) &&
-      (chunk.contextualized_text || chunk.original_text)
+      !this.db.getEmbeddingByChunkId(chunk.id)
     );
 
     if (pendingChunks.length === 0) {
@@ -119,7 +123,7 @@ export class EmbeddingService {
     // Process chunks in batches
     for (let i = 0; i < pendingChunks.length; i += opts.batchSize!) {
       const batch = pendingChunks.slice(i, i + opts.batchSize!);
-      const batchResult = await this.processBatch(batch, opts);
+      const batchResult = await this.processBatch(document, batch, opts);
 
       results.push(...batchResult.results);
       totalTokensUsed += batchResult.totalTokensUsed;
@@ -154,20 +158,27 @@ export class EmbeddingService {
     documentId: number,
     options?: Partial<EmbeddingOptions>
   ): Promise<BatchEmbeddingResult> {
+    const document = this.db.getDocumentById(documentId);
+    if (!document) {
+      throw new ValidationError(`Document with ID ${documentId} not found`);
+    }
+    
     const chunks = this.db.getChunksByDocumentId(documentId);
-    return this.generateEmbeddingsForChunks(chunks, options);
+    return this.generateEmbeddingsForChunks(document, chunks, options);
   }
 
   /**
    * Process a batch of chunks
    */
   private async processBatch(
+    document: Document,
     batch: Chunk[],
     options: EmbeddingOptions
   ): Promise<BatchEmbeddingResult> {
     try {
-      // Prepare texts for batch embedding
-      const texts = batch.map(chunk => chunk.contextualized_text || chunk.original_text);
+      // Get chunk texts from file
+      const chunkContents = await this.chunkResolver.resolveMultipleChunks(document, batch);
+      const texts = chunkContents.map(content => content.text);
       const validTexts = texts.filter(text => text && text.trim().length > 0);
 
       if (validTexts.length === 0) {

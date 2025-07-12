@@ -8,11 +8,11 @@ This document outlines the complete implementation plan for a TypeScript-based R
 
 - ✅ **Phase 1: Project Foundation** - COMPLETED
 - ✅ **Phase 2: Core Services** - COMPLETED
-- ⏳ **Phase 3: CLI Implementation** - PENDING  
+- ✅ **Phase 3: CLI Implementation** - COMPLETED  
 - ⏳ **Phase 4: MCP Server Integration** - PENDING
 - ⏳ **Phase 5: Testing and Optimization** - PENDING
 
-**Current Status**: Phase 2 complete with comprehensive core services including document processing, contextual retrieval, and embedding generation. Ready for Phase 3 CLI implementation.
+**Current Status**: Phase 3 complete with fully functional CLI including linear chunk processing, configurable parallelism, and comprehensive verbose logging. Core functionality ready for production use.
 
 ### Core Objectives
 
@@ -86,9 +86,10 @@ This document outlines the complete implementation plan for a TypeScript-based R
   - `--config-path` CLI parameter
 - **Files**:
   - `config.json` - User configuration and API keys
-  - `database.db` - SQLite database with embeddings
+  - `database.db` - SQLite database with file references and embeddings (no content storage)
 - **Cross-platform Support**: Uses Node.js `os.homedir()` for reliable home directory detection
 - **Co-location**: Configuration and database stored in same directory for portability
+- **File-Reference Architecture**: Database stores only file paths, positions, and embeddings - original files remain the source of truth
 
 ### Default AI Models
 - **Embedding Model**: `text-embedding-3-small` (OpenAI) - Cost-effective with good performance
@@ -150,26 +151,35 @@ This document outlines the complete implementation plan for a TypeScript-based R
 - Create embedding storage and retrieval
 - Implement batch embedding processing
 
-### Phase 3: CLI Implementation (Days 5-6)
+### Phase 3: CLI Implementation (Days 5-6) ✅ COMPLETED
 
 #### 3.1 Command Structure
 - ✅ Implement `rag init` command for project initialization
 - ✅ Create `rag db-init` for database setup
-- ✅ Add `rag add <file>` for document ingestion
+- ✅ Add `rag add <file>` for document ingestion with linear processing
 - ✅ Implement `rag search <query>` for testing searches
+- ✅ Add configurable parallelism with `--max-parallel` option
+- ✅ Implement comprehensive verbose logging with `--verbose` option
 - Add `rag server` to start MCP server
 
 #### 3.2 User Experience
-- Add progress indicators for long-running operations
-- Implement comprehensive error messages
-- Create help documentation for each command
-- Add configuration validation and troubleshooting
+- ✅ Add progress indicators for long-running operations
+- ✅ Implement comprehensive error messages
+- ✅ Create help documentation for each command
+- ✅ Add configuration validation and troubleshooting
 
 #### 3.3 Interactive Setup
-- Implement API key collection with secure input
-- Add model selection after fetching available models
-- Create configuration validation and testing
-- Add setup completion confirmation
+- ✅ Implement API key collection with secure input
+- ✅ Add model selection after fetching available models
+- ✅ Create configuration validation and testing
+- ✅ Add setup completion confirmation
+
+#### 3.4 Advanced Processing Features ✅ NEW
+- ✅ Linear chunk processing pipeline (Read → Context → Embedding → Store)
+- ✅ Configurable parallelism with semaphore-based concurrency control
+- ✅ Comprehensive verbose logging for debugging and monitoring
+- ✅ File-reference architecture with no content storage in database
+- ✅ Enhanced error handling with detailed pipeline failure reporting
 
 ### Phase 4: MCP Server Integration (Days 7-8)
 
@@ -216,30 +226,31 @@ This document outlines the complete implementation plan for a TypeScript-based R
 ### Database Schema
 
 ```sql
--- Documents table with processing status tracking
+-- Documents table with file reference tracking (no content storage)
 CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
-    content TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
+    file_hash TEXT NOT NULL,          -- SHA-256 hash of original file for integrity
+    file_size INTEGER NOT NULL,       -- File size in bytes for validation
+    file_modified DATETIME,           -- Last modified timestamp of original file
+    text_encoding TEXT DEFAULT 'utf-8', -- Text encoding of the file
     total_chunks INTEGER NOT NULL,
     processed_chunks INTEGER DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'complete', 'failed'
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'complete', 'failed', 'file_missing'
     last_error TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Chunks table with detailed processing status
+-- Chunks table with position indices only (no text content)
 CREATE TABLE chunks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id INTEGER NOT NULL,
     chunk_index INTEGER NOT NULL,
-    original_text TEXT NOT NULL,
-    contextualized_text TEXT,
-    start_position INTEGER NOT NULL,
-    end_position INTEGER NOT NULL,
+    start_position INTEGER NOT NULL,  -- Start character position in original file
+    end_position INTEGER NOT NULL,    -- End character position in original file  
+    chunk_length INTEGER NOT NULL,    -- Length in characters for validation
     status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'contextualized', 'embedded', 'complete', 'failed'
     error_message TEXT,
     processing_step TEXT, -- 'chunking', 'context_generation', 'embedding', 'storage'
@@ -247,7 +258,7 @@ CREATE TABLE chunks (
     FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
 );
 
--- Embeddings table with vector support
+-- Embeddings table with vector support (unchanged)
 CREATE TABLE embeddings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chunk_id INTEGER NOT NULL,
@@ -258,7 +269,7 @@ CREATE TABLE embeddings (
     FOREIGN KEY (chunk_id) REFERENCES chunks(id) ON DELETE CASCADE
 );
 
--- Vector search table (sqlite-vss)
+-- Vector search table (sqlite-vss) - unchanged
 CREATE VIRTUAL TABLE vector_index USING vss0(
     embedding(1536),  -- OpenAI text-embedding-3-small dimension
     chunk_id INTEGER
@@ -322,6 +333,10 @@ interface RagConfig {
         provider: 'anthropic' | 'openai';
         maxContextTokens: number;
         prompt: string;
+    };
+    processing?: {
+        maxParallelChunks: number;      // 1-20, default: 5
+        enableLinearProcessing: boolean; // default: true
     };
 }
 ```
@@ -540,7 +555,13 @@ rag-tool/
 - Implement overlapping chunks to preserve context
 - Optimize chunk size based on embedding model limits
 - Use sentence boundary detection for natural breaks
-- Cache chunking results for repeated processing
+- Store precise character positions for efficient text extraction
+
+### File I/O Optimization
+- Implement intelligent caching for frequently accessed files
+- Batch file reads when processing multiple chunks from the same document
+- Use memory-mapped files for large documents when possible
+- Implement async file operations to avoid blocking
 
 ### Embedding Optimization
 - Implement batch processing for multiple chunks
@@ -550,9 +571,16 @@ rag-tool/
 
 ### Search Performance
 - Use vector indexes for fast similarity search
-- Implement result caching for common queries
+- Implement lazy loading for chunk content display
+- Cache recently accessed file content in memory
 - Optimize database queries with proper indexing
 - Implement pagination for large result sets
+
+### File Integrity Management
+- Implement efficient file hash checking
+- Use file modification timestamps for quick staleness detection
+- Batch integrity checks for multiple documents
+- Implement background monitoring for file changes
 
 ## Security Considerations
 
@@ -563,9 +591,10 @@ rag-tool/
 - Never log or expose API keys
 
 ### Data Privacy
-- Implement local-only storage by default
-- Provide data deletion capabilities
-- Handle sensitive documents appropriately
+- Implement local-only storage by default with no content in database
+- File-reference architecture ensures sensitive content remains in original files
+- Provide data deletion capabilities for both database records and file references
+- Handle sensitive documents appropriately with configurable file access policies
 - Implement access controls for multi-user scenarios
 
 ### Input Validation
@@ -654,12 +683,12 @@ rag-tool/
 - [x] 2.4.3 Create embedding storage and retrieval
 - [x] 2.4.4 Implement batch embedding processing
 
-### Phase 3: CLI Implementation (Days 5-6)
+### Phase 3: CLI Implementation (Days 5-6) ✅ COMPLETED
 - [x] 3.1.1 Implement `rag-tool init` command for project initialization
 - [x] 3.1.2 Create `rag-tool db-init` for database setup
-- [x] 3.1.3 Add `rag-tool add <file>` for document ingestion
+- [x] 3.1.3 Add `rag-tool add <file>` for document ingestion with linear processing
 - [x] 3.1.4 Implement `rag-tool search <query>` for testing searches
-- [ ] 3.1.5 Add `rag-tool server` to start MCP server
+- [ ] 3.1.5 Add `rag-tool server` to start MCP server (moved to Phase 4)
 - [x] 3.2.1 Add progress indicators for long-running operations
 - [x] 3.2.2 Implement comprehensive error messages
 - [x] 3.2.3 Create help documentation for each command
@@ -668,6 +697,11 @@ rag-tool/
 - [x] 3.3.2 Add model selection after fetching available models
 - [x] 3.3.3 Create configuration validation and testing
 - [x] 3.3.4 Add setup completion confirmation
+- [x] 3.4.1 Implement linear chunk processing pipeline (NEW)
+- [x] 3.4.2 Add configurable parallelism with --max-parallel option (NEW)
+- [x] 3.4.3 Implement comprehensive verbose logging (NEW)
+- [x] 3.4.4 Create ChunkProcessingService for unified pipeline (NEW)
+- [x] 3.4.5 Add file-reference architecture with integrity checking (NEW)
 
 ### Phase 4: MCP Server Integration (Days 7-8)
 - [ ] 4.1.1 Set up MCP server with TypeScript SDK
