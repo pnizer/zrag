@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { createInitCommand } from './commands/init.js';
 import { createDbInitCommand } from './commands/db-init.js';
 import { createAddCommand } from './commands/add.js';
+import { createSearchCommand } from './commands/search.js';
 
 const program = new Command();
 
@@ -15,13 +16,7 @@ program
 program.addCommand(createInitCommand());
 program.addCommand(createDbInitCommand());
 program.addCommand(createAddCommand());
-
-program
-  .command('search <query>')
-  .description('Search through documents')
-  .action((query) => {
-    console.log(`🚧 Search not implemented yet: ${query}`);
-  });
+program.addCommand(createSearchCommand());
 
 program
   .command('server')
