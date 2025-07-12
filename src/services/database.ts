@@ -111,12 +111,48 @@ export class DatabaseService {
   }
 
   /**
-   * Load vector extension (placeholder for future implementation)
+   * Load vector extension using sqlite-vss npm package
    */
   private async loadVectorExtension(): Promise<void> {
-    // TODO: Implement platform detection and binary loading
-    // This will be implemented when we bundle the sqlite-vss binaries
-    console.warn('Vector extension not yet implemented - will use basic similarity for now');
+    if (!this.db) throw new DatabaseError('Database not initialized');
+
+    try {
+      // Dynamically import sqlite-vss (ES module)
+      const sqlite_vss = await import('sqlite-vss');
+      
+      // Load sqlite-vss extension using the convenience method
+      sqlite_vss.load(this.db);
+      
+      // Verify the extension loaded correctly
+      const version = this.db.prepare('SELECT vss_version()').pluck().get();
+      console.log(`sqlite-vss loaded successfully, version: ${version}`);
+      
+      // Create virtual vector table
+      await this.createVectorTable();
+      
+    } catch (error) {
+      throw new DatabaseError(`Failed to load vector extension: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Create vector search virtual table
+   */
+  private async createVectorTable(): Promise<void> {
+    if (!this.db) throw new DatabaseError('Database not initialized');
+
+    try {
+      // Create virtual table for vector search (1536 dimensions for OpenAI text-embedding-3-small)
+      this.db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vector_index USING vss0(
+          embedding(1536)
+        )
+      `);
+      
+      console.log('Vector table created successfully');
+    } catch (error) {
+      throw new DatabaseError(`Failed to create vector table: ${String(error)}`);
+    }
   }
 
   /**
@@ -342,19 +378,30 @@ export class DatabaseService {
     const db = this.getDb();
     
     try {
-      const stmt = db.prepare(`
-        INSERT INTO embeddings (chunk_id, embedding, model_used, embedding_dimension)
-        VALUES (?, ?, ?, ?)
-      `);
-      
-      const result = stmt.run(
-        embedding.chunk_id,
-        embedding.embedding,
-        embedding.model_used,
-        embedding.embedding_dimension
-      );
-      
-      return this.getEmbeddingById(result.lastInsertRowid as number)!;
+      return this.transaction(() => {
+        // Insert into embeddings table
+        const stmt = db.prepare(`
+          INSERT INTO embeddings (chunk_id, embedding, model_used, embedding_dimension)
+          VALUES (?, ?, ?, ?)
+        `);
+        
+        const result = stmt.run(
+          embedding.chunk_id,
+          embedding.embedding,
+          embedding.model_used,
+          embedding.embedding_dimension
+        );
+        
+        const embeddingId = result.lastInsertRowid as number;
+        
+        // Convert BLOB back to array for vector index
+        const embeddingArray = Array.from(new Float32Array(embedding.embedding as ArrayBuffer));
+        
+        // Insert into vector index
+        this.insertEmbeddingIntoVectorIndex(embeddingId, embeddingArray);
+        
+        return this.getEmbeddingById(embeddingId)!;
+      });
     } catch (error) {
       throw new DatabaseError(`Failed to insert embedding: ${String(error)}`);
     }
@@ -391,16 +438,93 @@ export class DatabaseService {
   }
 
   /**
-   * Basic similarity search (placeholder until vector extension is implemented)
+   * Vector similarity search using sqlite-vss
    */
-  searchSimilarChunks(_queryEmbedding: number[], _limit: number = 10, _threshold: number = 0.7): Array<{
+  searchSimilarChunks(queryEmbedding: number[], limit: number = 10, threshold: number = 0.7): Array<{
     chunk: Chunk;
     document: Document;
     similarity_score: number;
   }> {
-    // TODO: Implement proper vector similarity search with sqlite-vss
-    // For now, return empty array as placeholder
-    console.warn('Vector search not implemented yet - returning empty results');
-    return [];
+    const db = this.getDb();
+    
+    try {
+      // Convert embedding to the format expected by sqlite-vss
+      const embeddingBlob = Buffer.from(new Float32Array(queryEmbedding).buffer);
+      
+      const stmt = db.prepare(`
+        SELECT 
+          c.*,
+          d.filename,
+          d.filepath,
+          d.content as document_content,
+          d.content_hash,
+          d.last_error,
+          d.created_at as document_created_at,
+          v.distance
+        FROM vector_index v
+        JOIN embeddings e ON e.rowid = v.rowid
+        JOIN chunks c ON c.id = e.chunk_id
+        JOIN documents d ON d.id = c.document_id
+        WHERE v.embedding MATCH ?
+          AND v.distance <= ?
+        ORDER BY v.distance
+        LIMIT ?
+      `);
+      
+      const results = stmt.all(embeddingBlob, 1 - threshold, limit) as any[];
+      
+      return results.map(row => ({
+        chunk: {
+          id: row.id,
+          document_id: row.document_id,
+          chunk_index: row.chunk_index,
+          original_text: row.original_text,
+          contextualized_text: row.contextualized_text,
+          start_position: row.start_position,
+          end_position: row.end_position,
+          status: row.status,
+          error_message: row.error_message,
+          processing_step: row.processing_step,
+          created_at: row.created_at
+        },
+        document: {
+          id: row.document_id,
+          filename: row.filename,
+          filepath: row.filepath,
+          content: row.document_content,
+          content_hash: row.content_hash,
+          total_chunks: 0, // Will be filled by calling code if needed
+          processed_chunks: 0, // Will be filled by calling code if needed
+          status: 'complete', // Assume complete since we're searching
+          last_error: row.last_error || null,
+          created_at: row.document_created_at,
+          updated_at: row.document_created_at
+        } as Document,
+        similarity_score: 1 - row.distance // Convert distance to similarity
+      }));
+    } catch (error) {
+      throw new DatabaseError(`Failed to search similar chunks: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Insert embedding into vector index
+   */
+  insertEmbeddingIntoVectorIndex(embeddingId: number, embedding: number[]): void {
+    const db = this.getDb();
+    
+    try {
+      // Convert embedding to the format expected by sqlite-vss
+      const embeddingBlob = Buffer.from(new Float32Array(embedding).buffer);
+      
+      const stmt = db.prepare(`
+        INSERT INTO vector_index (rowid, embedding)
+        VALUES (?, ?)
+      `);
+      
+      stmt.run(embeddingId, embeddingBlob);
+    } catch (error) {
+      throw new DatabaseError(`Failed to insert embedding into vector index: ${String(error)}`);
+    }
   }
 }

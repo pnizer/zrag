@@ -60,7 +60,7 @@ This document outlines the complete implementation plan for a TypeScript-based R
 ### Core Dependencies
 - **Runtime**: Node.js 18+ with TypeScript
 - **Package Manager**: npm (for npx distribution)
-- **Database**: SQLite with bundled sqlite-vss extension for vector operations
+- **Database**: SQLite with sqlite-vss npm package for vector operations
 - **AI APIs**: OpenAI API (embeddings and context generation)
 - **CLI Framework**: Commander.js for command-line interface
 - **MCP Integration**: @modelcontextprotocol/sdk for server implementation
@@ -77,7 +77,7 @@ This document outlines the complete implementation plan for a TypeScript-based R
 - **Package Manager**: npm for publication
 - **Usage**: npx rag-tool commands (no global installation required)
 - **Build**: Single bundled CLI with embedded dependencies
-- **Platform Support**: Cross-platform with bundled native extensions
+- **Platform Support**: Cross-platform via sqlite-vss npm package optional dependencies
 
 ### Configuration and Storage
 - **Default Location**: User home directory (`~/.rag-tool/`) for cross-platform compatibility
@@ -105,7 +105,7 @@ This document outlines the complete implementation plan for a TypeScript-based R
 - ✅ Configure package.json with dependencies and npx-compatible bin entry
 - ✅ Set up TypeScript configuration with strict mode
 - ✅ Create project directory structure
-- ✅ Configure build scripts for esbuild bundling with platform-specific sqlite-vss binaries
+- ✅ Configure build scripts for esbuild bundling with sqlite-vss npm package
 - ✅ Set up prepublishOnly script for automated building
 
 #### 1.2 Configuration System ✅ COMPLETED
@@ -124,8 +124,8 @@ This document outlines the complete implementation plan for a TypeScript-based R
 ### Phase 2: Core Services (Days 3-4)
 
 #### 2.1 Database Layer ✅ COMPLETED
-- ✅ Set up SQLite with bundled sqlite-vss extension (cross-platform binaries)
-- ✅ Implement platform detection and binary loading for vector extensions
+- ✅ Set up SQLite with sqlite-vss npm package (automatic cross-platform support)
+- ✅ Implement sqlite-vss integration using npm package
 - ✅ Define database schema for documents, chunks, and embeddings
 - ✅ Implement DatabaseService with CRUD operations
 - ✅ Add vector similarity search functions
@@ -494,12 +494,6 @@ rag-tool/
 │       ├── chunking.ts
 │       ├── text-processing.ts
 │       └── errors.ts
-├── binaries/
-│   ├── sqlite-vss-darwin-x64.dylib
-│   ├── sqlite-vss-darwin-arm64.dylib
-│   ├── sqlite-vss-linux-x64.so
-│   ├── sqlite-vss-linux-arm64.so
-│   └── sqlite-vss-win32-x64.dll
 ├── dist/
 │   └── cli.js (bundled executable)
 ├── tests/
@@ -627,7 +621,7 @@ rag-tool/
 - [x] 1.1.2 Configure package.json with dependencies and npx-compatible bin entry
 - [x] 1.1.3 Set up TypeScript configuration with strict mode
 - [x] 1.1.4 Create project directory structure
-- [x] 1.1.5 Configure build scripts for esbuild bundling with platform-specific sqlite-vss binaries
+- [x] 1.1.5 Configure build scripts for esbuild bundling with sqlite-vss npm package
 - [x] 1.1.6 Set up prepublishOnly script for automated building
 - [x] 1.2.1 Design configuration schema for API keys and settings
 - [x] 1.2.2 Implement cross-platform configuration path resolution (user home directory default)
@@ -640,8 +634,8 @@ rag-tool/
 - [x] 1.3.4 Create provider factory and registration system
 
 ### Phase 2: Core Services (Days 3-4)
-- [x] 2.1.1 Set up SQLite with bundled sqlite-vss extension (cross-platform binaries)
-- [x] 2.1.2 Implement platform detection and binary loading for vector extensions
+- [x] 2.1.1 Set up SQLite with sqlite-vss npm package (automatic cross-platform support)
+- [x] 2.1.2 Implement sqlite-vss integration using npm package
 - [x] 2.1.3 Define database schema for documents, chunks, and embeddings
 - [x] 2.1.4 Implement DatabaseService with CRUD operations
 - [x] 2.1.5 Add vector similarity search functions

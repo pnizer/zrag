@@ -45,11 +45,7 @@ async function addDocument(
   console.log('');
 
   // Validate file path
-  try {
-    validateFilePath(filePath);
-  } catch (error) {
-    throw error;
-  }
+  validateFilePath(filePath);
 
   const absolutePath = path.resolve(filePath);
   console.log('📁 File:', absolutePath);
@@ -151,7 +147,6 @@ async function addDocument(
         const overwrite = await promptConfirm('Do you want to continue anyway?', false);
         if (!overwrite) {
           console.log('Document addition cancelled.');
-          dbService.close();
           return;
         }
       }
@@ -186,7 +181,6 @@ async function addDocument(
         const continueProcessing = await promptConfirm('Continue with embedding generation?', true);
         if (!continueProcessing) {
           console.log('Processing stopped. You can resume later with the same command.');
-          dbService.close();
           return;
         }
       }
@@ -250,9 +244,6 @@ async function addDocument(
     console.log(`  🔍 Search: rag-tool search "your query"`);
     console.log(`  📋 List: rag-tool list`);
     console.log('');
-
-  } catch (error) {
-    throw error;
   } finally {
     dbService.close();
   }

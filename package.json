@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsc --watch",
-    "build": "tsc && esbuild src/cli/index.ts --bundle --platform=node --target=node18 --outfile=dist/cli.js --banner:js='#!/usr/bin/env node'",
+    "build": "tsc && esbuild src/cli/index.ts --bundle --platform=node --target=node18 --outfile=dist/cli.js --external:better-sqlite3 --external:sqlite-vss",
     "build:lib": "tsc",
     "prepublishOnly": "npm run build",
     "test": "jest",
@@ -37,6 +37,7 @@
     "better-sqlite3": "^9.0.0",
     "commander": "^11.0.0",
     "openai": "^4.0.0",
+    "sqlite-vss": "^0.1.2",
     "zod": "^3.22.0"
   },
   "devDependencies": {

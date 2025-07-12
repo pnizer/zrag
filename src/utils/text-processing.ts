@@ -9,6 +9,7 @@ export class TextProcessor {
       // Normalize Unicode characters
       .normalize('NFKD')
       // Remove or replace problematic characters
+      // eslint-disable-next-line no-control-regex
       .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // Remove control characters
       .replace(/\u00A0/g, ' ') // Replace non-breaking spaces with regular spaces
       // Normalize whitespace

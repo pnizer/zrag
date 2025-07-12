@@ -94,8 +94,11 @@ export async function promptChoice<T>(
   
   console.log('');
   
-  while (true) {
-    const answer = await promptUser('Enter your choice (number): ');
+  let answer = '';
+  const validChoice = false;
+  
+  do {
+    answer = await promptUser('Enter your choice (number): ');
     
     if (answer === '' && defaultIndex !== undefined) {
       return choices[defaultIndex]!.value;
@@ -108,5 +111,8 @@ export async function promptChoice<T>(
     }
     
     console.log(`Please enter a number between 1 and ${choices.length}`);
-  }
+  } while (!validChoice);
+  
+  // This should never be reached, but TypeScript needs it
+  return choices[0]!.value;
 }

@@ -249,35 +249,37 @@ async function configureChunking(): Promise<object> {
   const chunkSizeDefault = strategy === 'sentence' ? 1000 : strategy === 'paragraph' ? 1500 : 800;
   const overlapDefault = Math.floor(chunkSizeDefault * 0.2);
 
-  let chunkSize: number;
-  while (true) {
-    const input = await promptUser(`Chunk size (${chunkSizeDefault}): `);
-    if (input === '') {
+  let chunkSize: number = chunkSizeDefault;
+  let chunkSizeInput = '';
+  do {
+    chunkSizeInput = await promptUser(`Chunk size (${chunkSizeDefault}): `);
+    if (chunkSizeInput === '') {
       chunkSize = chunkSizeDefault;
       break;
     }
-    const parsed = parseInt(input);
+    const parsed = parseInt(chunkSizeInput);
     if (!isNaN(parsed) && parsed > 0 && parsed <= 10000) {
       chunkSize = parsed;
       break;
     }
     console.log('Please enter a number between 1 and 10000');
-  }
+  } while (chunkSizeInput !== '');
 
-  let overlap: number;
-  while (true) {
-    const input = await promptUser(`Overlap size (${overlapDefault}): `);
-    if (input === '') {
+  let overlap: number = overlapDefault;
+  let overlapInput = '';
+  do {
+    overlapInput = await promptUser(`Overlap size (${overlapDefault}): `);
+    if (overlapInput === '') {
       overlap = overlapDefault;
       break;
     }
-    const parsed = parseInt(input);
+    const parsed = parseInt(overlapInput);
     if (!isNaN(parsed) && parsed >= 0 && parsed < chunkSize) {
       overlap = parsed;
       break;
     }
     console.log(`Please enter a number between 0 and ${chunkSize - 1}`);
-  }
+  } while (overlapInput !== '');
 
   return {
     strategy,
@@ -306,20 +308,21 @@ async function configureContextGeneration(providers: string[]): Promise<object> 
     0
   );
 
-  let maxTokens: number;
-  while (true) {
-    const input = await promptUser('Max tokens for context generation (500): ');
-    if (input === '') {
+  let maxTokens: number = 500;
+  let maxTokensInput = '';
+  do {
+    maxTokensInput = await promptUser('Max tokens for context generation (500): ');
+    if (maxTokensInput === '') {
       maxTokens = 500;
       break;
     }
-    const parsed = parseInt(input);
+    const parsed = parseInt(maxTokensInput);
     if (!isNaN(parsed) && parsed > 0 && parsed <= 2000) {
       maxTokens = parsed;
       break;
     }
     console.log('Please enter a number between 1 and 2000');
-  }
+  } while (maxTokensInput !== '');
 
   return {
     provider,

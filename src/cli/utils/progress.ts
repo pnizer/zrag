@@ -1,7 +1,7 @@
 export class ProgressIndicator {
   private spinner = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
   private currentFrame = 0;
-  private interval: NodeJS.Timeout | undefined;
+  private interval: ReturnType<typeof setInterval> | undefined;
   private message: string;
 
   constructor(message: string) {
